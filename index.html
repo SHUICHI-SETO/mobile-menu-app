@@ -29,149 +29,179 @@
             width: 100%;
         }
         .tip-button.tip-selected {
-            background-color: #dbeafe;
-            border-color: #3b82f6;
-            color: #1e40af;
-            box-shadow: 0 0 0 1px #3b82f6;
+            background-color: #f87171; /* soft-red */
+            color: white;
+            border-color: #f87171;
+            box-shadow: 0 4px 6px rgba(248, 113, 113, 0.2);
         }
-        /* 数量コントロールボタン */
+
+        /* 数量コントロールボタンの基本スタイル */
         .qty-btn {
-            width: 40px; 
-            height: 40px; 
-            border-radius: 50%; 
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
             font-size: 1.5rem;
             font-weight: 700;
-            line-height: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.1s;
+            transition: background-color 0.15s;
+            flex-shrink: 0;
         }
-        .qty-btn:active {
-            transform: scale(0.95);
-        }
-        
-        /* カテゴリタブのコンテナ */
-        #category-tabs::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
-        }
-        #category-tabs {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
-        }
-        
-        /* モーダル背景 */
+
+        /* カスタムカラー */
+        .bg-soft-red { background-color: #f87171; }
+        .text-icon-green { color: #10b981; } /* エメラルドグリーン */
+        .text-icon-yellow { color: #facc15; } /* アンバー */
+        .text-icon-red { color: #ef4444; } /* レッド */
+        .bg-primary-blue { background-color: #3b82f6; }
+        .bg-primary-hover { background-color: #2563eb; }
+
+        /* モーダルオーバーレイ */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            display: flex;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: none; /* 初期状態では非表示 */
             align-items: center;
             justify-content: center;
+            z-index: 50;
         }
-        /* モーダルコンテンツ */
-        .modal-content {
-            z-index: 1001;
+
+        /* メッセージモーダル */
+        #message-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 60;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            display: none;
         }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary-blue': '#3b82f6',
-                        'primary-hover': '#2563eb',
-                        'soft-red': '#ef4444',
-                        'icon-green': '#10b981',
-                        'icon-yellow': '#f59e0b',
-                        'icon-red': '#ef4444',
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="pb-32">
-    
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    
-    <script>
-        /**
- * テーブル選択モーダルを表示し、テーブルボタンを描画する
- */
-function showTableModal() {
-    const overlay = document.getElementById('table-modal-overlay');
-    const grid = document.getElementById('table-selection-grid');
-    const mainContent = document.getElementById('main-content');
-    const mainFooter = document.getElementById('main-footer');
-    
-    // 既にテーブルが選択されている場合は何もしない
-    if (currentTable) {
-        overlay.style.display = 'none';
-        mainContent.style.display = 'block';
-        mainFooter.style.display = 'block';
-        return;
-    }
+<body>
 
-    // テーブルボタンを描画
-    grid.innerHTML = TABLES.map(table => `
-        <button onclick="selectTable('${table}')" 
-                class="bg-primary-blue text-white font-bold text-2xl py-4 rounded-xl shadow-lg hover:bg-primary-hover transition duration-150 ease-in-out">
-            ${table}
-        </button>
-    `).join('');
+    <div id="message-modal" class="bg-white">
+        <p id="message-text" class="text-lg font-medium text-gray-800"></p>
+        <button onclick="document.getElementById('message-modal').style.display='none';" class="mt-4 px-4 py-2 bg-primary-blue text-white rounded-lg hover:bg-primary-hover transition">OK</button>
+    </div>
 
-    overlay.style.display = 'flex'; // モーダルを表示
-    mainContent.style.display = 'none';
-    mainFooter.style.display = 'none';
-    
-    // ヘッダーのタイトルを「テーブルを選択中...」に設定
-    document.getElementById('full-header-title').textContent = getText('select_table_title');
-}
+    <div id="table-modal-overlay" class="modal-overlay">
+        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">テーブルを選択してください</h2>
+            <div id="table-selection-grid" class="grid grid-cols-2 gap-4"> 
+                </div>
+            <p class="text-sm text-center text-gray-500 mt-6">
+                ※一度選択すると、注文を送信するまでテーブルは変更できません。
+            </p>
+        </div>
+    </div>
 
-/**
- * テーブルを選択し、メインメニューを表示する
- * @param {string} table - 選択されたテーブルID (例: 'T1')
- */
-function selectTable(table) {
-    currentTable = table;
-    const overlay = document.getElementById('table-modal-overlay');
-    const mainContent = document.getElementById('main-content');
-    const mainFooter = document.getElementById('main-footer');
+    <div id="main-content" style="display: none;">
+        <header class="sticky top-0 bg-white shadow-md p-4 flex justify-between items-center z-40">
+            <h1 id="full-header-title" class="text-xl font-bold text-gray-800">モバイル注文メニュー</h1>
+            <button id="lang-button" onclick="toggleLanguage()" class="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200 transition">EN</button>
+        </header>
 
-    // ヘッダーを更新
-    document.getElementById('full-header-title').innerHTML = 
-        `${getText('table_display')} ${currentTable} ${getText('header_title')}`;
+        <div class="p-4 bg-white sticky top-[68px] z-30 shadow-sm">
+            <div class="flex space-x-2 mb-4">
+                <button id="vegan-filter-button" onclick="toggleVeganFilter()" class="flex items-center text-sm font-medium bg-gray-200 text-gray-700 px-3 py-1 rounded-full hover:bg-gray-300 transition">
+                    ビーガンのみ
+                </button>
+                </div>
+            
+            <div class="overflow-x-auto">
+                <div id="category-tabs" class="flex space-x-3 pb-2">
+                    </div>
+            </div>
+        </div>
 
-    // モーダルを非表示にし、メインコンテンツを表示
-    overlay.style.display = 'none';
-    mainContent.style.display = 'block';
-    mainFooter.style.display = 'block';
+        <main class="p-4 space-y-4 pb-[300px]">
+            <div id="product-list" class="space-y-4">
+                </div>
+        </main>
+    </div>
 
-    // UIを初期化・更新
-    renderAllUI(); 
-}
-        // 🚨 以前のコードで未定義だった関数を定義
-        function showMessage(text, type) {
-            const box = document.getElementById('message-box');
-            if (!box) return;
-            box.textContent = text;
-            box.className = `fixed bottom-24 right-4 p-4 max-w-xs rounded-xl shadow-2xl transition-opacity duration-300 opacity-100 font-semibold whitespace-pre-line z-50 text-sm ${type === 'error' ? 'bg-soft-red text-white' : 'bg-icon-green text-white'}`;
-            setTimeout(() => {
-                box.classList.remove('opacity-100');
-                box.classList.add('opacity-0');
-            }, 3000);
-        }
-        function hideModal(id) {
-            const modal = document.getElementById(id);
-            if(modal) modal.style.display = 'none';
-        }
+    <footer id="main-footer" class="fixed bottom-0 left-0 w-full bg-white shadow-2xl p-4 z-40" style="display: none;">
+        <h2 class="text-lg font-bold text-gray-800 mb-3">カート <span id="cart-quantity-indicator" class="text-soft-red ml-2">0</span></h2>
         
+        <div class="space-y-1 text-sm mb-3">
+            <div class="flex justify-between">
+                <span id="cart-subtotal-label">小計</span>
+                <span id="cart-subtotal-value">¥0</span>
+            </div>
+            <div class="flex justify-between">
+                <span id="cart-tax-label">税金 (10%)</span>
+                <span id="cart-tax-value">¥0</span>
+            </div>
+            
+            <div class="flex justify-between items-center py-2 border-t mt-2">
+                <span id="cart-tip-label" class="font-bold">チップ</span>
+                <span id="cart-tip-value" class="font-bold">¥0</span>
+            </div>
+            <div id="tip-buttons" class="grid grid-cols-4 gap-2 text-xs mb-3">
+                </div>
+            
+            <div class="flex justify-between font-extrabold text-lg pt-2 border-t border-gray-300">
+                <span id="cart-total-label">合計</span>
+                <span id="cart-total-value" class="text-soft-red">¥0</span>
+            </div>
+        </div>
+        
+        <div class="mt-4 space-y-3">
+            <label for="notes-input" id="notes-label" class="text-sm font-medium text-gray-700">備考:</label>
+            <textarea id="notes-input" rows="2" class="w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="アレルギーや特別なリクエストがあれば記入してください"></textarea>
+            
+            <div class="flex space-x-3">
+                <button id="clear-cart-button" onclick="clearCart()" class="w-1/3 bg-gray-400 text-white font-bold py-3 rounded-xl hover:bg-gray-500 transition">カートをクリア</button>
+                <button id="send-order-button" onclick="sendOrder()" disabled class="w-2/3 bg-soft-red text-white font-bold py-3 rounded-xl opacity-50 cursor-not-allowed hover:bg-red-600 transition">注文を送信</button>
+            </div>
+        </div>
+    </footer>
+
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+    // ------------------------------------------------------
+    // I. 定数とグローバル変数の定義
+    // ------------------------------------------------------
+    const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
+    const TAX_RATE = 0.10; // 10%
+    const TIP_RATES = [0, 0.10, 0.15, 0.20]; // 0%, 10%, 15%, 20%
+    
+    // UIテキストの多言語対応データ
+    const TEXTS = {
+        'header_title': { ja: 'メニュー', en: 'Menu' },
+        'table_display': { ja: 'テーブル', en: 'Table' },
+        'select_table_title': { ja: 'テーブルを選択してください', en: 'Select your table' },
+        'subtotal': { ja: '小計', en: 'Subtotal' },
+        'tax': { ja: '税金 (10%)', en: 'Tax (10%)' },
+        'tip': { ja: 'チップ', en: 'Tip' },
+        'total': { ja: '合計', en: 'Total' },
+        'send_order': { ja: '注文を送信', en: 'Send Order' },
+        'clear_cart': { ja: 'カートをクリア', en: 'Clear Cart' },
+        'notes_label': { ja: '備考:', en: 'Notes:' },
+        'notes_placeholder': { ja: 'アレルギーや特別なリクエストがあれば記入してください', en: 'Enter any allergies or special requests.' },
+        'filter_vegan': { ja: 'ビーガンのみ', en: 'Vegan Only' },
+        'category_all': { ja: 'すべて', en: 'All' },
+        'icon_vegan': { ja: 'ビーガン', en: 'Vegan' },
+        'icon_cooked': { ja: '調理済み', en: 'Cooked' },
+        'icon_allergy': { ja: 'アレルゲン含む', en: 'Contains Allergens' },
+        'not_found': { ja: '選択されたカテゴリに商品がありません。', en: 'No products found in this category.' },
+        'message_sent_success': { ja: '注文がキッチンに送信されました！', en: 'Order successfully sent to the kitchen!' },
+        'message_sent_failure': { ja: '注文の送信に失敗しました。', en: 'Failed to send order.' },
+        'confirm_clear': { ja: 'カートの内容をすべてクリアしてもよろしいですか？', en: 'Are you sure you want to clear the entire cart?' }
+    };
+
         // Firebase初期化
         const firebaseConfig = {
             apiKey: "AIzaSyBWVkm-z2b5Gc3NgaxRYqCArc3_1qGXt6M",
@@ -184,166 +214,29 @@ function selectTable(table) {
             measurementId: "G-ZL674LSY85"
         };
         firebase.initializeApp(firebaseConfig);
-    </script>
+
+    // 状態管理
+    let currentTable = null;
+    let currentLang = 'ja'; // 初期言語
+    let isVeganFilterActive = false;
+    let currentCategory = TEXTS.category_all.ja;
+    let currentTipRate = TIP_RATES[0];
+    let cart = {}; // カートの中身: { '商品コード': { product, quantity, price } }
+
+    // Firebaseの初期化
+    if (firebase.apps.length === 0) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
     
-    <div id="table-modal-overlay" class="modal-overlay">
-        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">テーブルを選択してください</h2>
-            <div id="table-selection-grid" class="grid grid-cols-2 gap-4">
-                </div>
-            <p class="text-sm text-center text-gray-500 mt-6">
-                ※一度選択すると、注文を送信するまでテーブルは変更できません。
-            </p>
-        </div>
-    </div>
+    // ------------------------------------------------------
+    // ⚠️ 3. 商品データ (const products) の定義
+    // ------------------------------------------------------
     
-    <div id="main-content" class="max-w-xl mx-auto p-4 hidden">
-        <header class="mb-4">
-            <div class="flex justify-between items-center mb-3">
-                <h1 class="text-xl md:text-2xl font-bold text-gray-800">
-                    <span id="full-header-title">テーブルを選択中...</span>
-                </h1>
-                <button id="lang-toggle-btn" onclick="toggleLanguage()" class="bg-white border border-gray-300 text-gray-700 text-sm py-1 px-3 rounded-lg shadow-sm hover:bg-gray-50 transition">English</button>
-            </div>
-            <p id="header-subtitle" class="text-sm text-gray-500 border-b pb-3">タッチして注文数を入力してください。</p>
-        </header>
-
-        <div id="filter-controls" class="flex justify-between items-center mb-4">
-            </div>
-
-        <div id="category-tabs" class="flex overflow-x-scroll whitespace-nowrap space-x-2 mb-6 p-1">
-            </div>
-
-        <div id="product-list" class="grid grid-cols-1 gap-6">
-            </div>
-
-        <div id="message-box" class="fixed bottom-24 right-4 p-4 max-w-xs rounded-xl shadow-2xl transition-opacity duration-300 opacity-0 bg-green-600 text-white font-semibold whitespace-pre-line z-50 text-sm">
-            </div>
-    </div>
-
-    <footer id="main-footer" class="fixed bottom-0 left-0 right-0 bg-white shadow-2xl border-t border-gray-200 p-4 z-40 hidden">
-        <div class="max-w-xl mx-auto">
-            <button id="tip-detail-toggle" class="text-sm text-primary-blue font-semibold mb-2 hover:underline" onclick="toggleTipDetails()">
-                チップ/料金詳細を閉じる (Hide Details)
-            </button>
-            
-            <div id="tip-detail-box" class="p-3 bg-gray-50 rounded-lg mb-3 text-sm transition-all duration-300">
-                <div id="tip-selection-area" class="mb-3">
-                    <p class="font-semibold mb-2" id="tip-selection-label">チップ率を選択してください:</p>
-                    <div id="tip-buttons-container" class="flex space-x-2">
-                        </div>
-                </div>
-                <p><span id="subtotal-text">小計</span>: <span id="subtotal-display">¥0</span></p>
-                <p><span id="tip-text">チップ (0%)</span>: <span id="tip-amount-display">¥0</span></p>
-            </div>
-
-            <div class="flex justify-between items-center">
-                <div>
-                    <p id="total-amount-label" class="text-sm text-gray-500">合計請求額</p>
-                    <p id="total-amount-display" class="text-3xl font-extrabold text-gray-900">¥0</p>
-                    <p id="summary-points" class="text-xs text-gray-500 mt-1">0点 (小計: ¥0)</p>
-                </div>
-                <button id="send-order-btn" onclick="sendOrder()"
-                        class="bg-soft-red text-white font-extrabold py-3 px-8 rounded-xl 
-                               hover:bg-red-600 active:bg-red-700 transition duration-150 ease-in-out shadow-lg text-lg opacity-50 cursor-not-allowed"
-                               disabled>
-                    注文を送信
-                </button>
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        // --- 定数定義 ---
-        const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
-        // ユーザー要求に基づき、チップ率の選択肢を定義 (0%, 10%, 15%, 20%)
-        const TIP_RATES = [0, 10, 15, 20]; 
-        const APP_ID = 'default-app-id'; // 固定値に変更
-
-        // 言語設定
-        let currentLang = 'ja'; 
-
-        // 状態管理
-        let currentTable = null; // 現在選択中のテーブル
-        let currentCategory = 'すべて'; 
-        let cart = {}; // { productId: { quantity: N, price: P }, ... }
-        let isVeganFilterActive = false;
-        // NEW: 現在選択中のチップ率 (初期値: 0%)
-        let currentTipRate = TIP_RATES[0]; 
-
-        // 静的テキストの多言語辞書
-        const TEXTS = {
-            'ja': {
-                header_title: 'の注文',
-                header_subtitle: 'タッチして注文数を入力してください。',
-                lang_button: 'English',
-                menu_title: 'メニュー',
-                filter_vegan: 'ビーガンのみ',
-                category_all: 'すべて',
-                footer_subtotal: '小計',
-                // NEW: 汎用的なチップ表示に変更
-                footer_tip: 'チップ',
-                footer_total: '合計請求額',
-                footer_points_1: '点 (小計: ',
-                footer_points_2: ')',
-                footer_send: '注文を送信',
-                // NEW: テキストも「サービス料」から「チップ」に変更
-                detail_close: 'チップ/料金詳細を閉じる',
-                detail_open: 'チップ/料金詳細を開く',
-                tip_label: 'チップ率を選択してください:', // NEW
-                tip_none: 'なし', // NEW (0%用)
-                message_error: 'エラー: カートに商品がありません。',
-                message_sent_success: '注文がキッチンに送信されました！',
-                // NEW: 注文失敗時のメッセージを追加
-                message_sent_failure: '注文送信に失敗しました。', 
-                icon_vegan: 'ビーガン',
-                icon_cooked: '調理済',
-                icon_allergy: 'アレルギー',
-                not_found: '該当する商品が見つかりませんでした。',
-                image_text: '商品画像',
-                select_table_title: 'テーブルを選択中...',
-                table_display: 'テーブル:',
-            },
-            'en': {
-                header_title: ' Order',
-                header_subtitle: 'Tap to input the quantity.',
-                lang_button: '日本語',
-                menu_title: 'Menu',
-                filter_vegan: 'Vegan Only',
-                category_all: 'All',
-                footer_subtotal: 'Subtotal',
-                // NEW: 汎用的なチップ表示に変更
-                footer_tip: 'Tip',
-                footer_total: 'Total Amount Due',
-                footer_points_1: ' items (Subtotal: ',
-                footer_points_2: ')',
-                footer_send: 'Send Order',
-                // NEW: テキストも「Service Fee」から「Tip/Fee」に変更
-                detail_close: 'Hide Tip/Fee Details',
-                detail_open: 'Show Tip/Fee Details',
-                tip_label: 'Select Tip Percentage:', // NEW
-                tip_none: 'None', // NEW (0%用)
-                message_error: 'Error: Cart is empty.',
-                message_sent_success: 'Order sent to the kitchen!',
-                // NEW: 注文失敗時のメッセージを追加
-                message_sent_failure: 'Order failed to send.', 
-                icon_vegan: 'Vegan',
-                icon_cooked: 'Cooked',
-                icon_allergy: 'Allergens',
-                not_found: 'No matching products found.',
-                image_text: 'Product Image',
-                select_table_title: 'Selecting Table...',
-                table_display: 'Table:',
-            }
-        };
-
-        // ... (getText, products, findProductByCode, formatCurrency, etc. の既存関数は省略) ...
-        // 🚨 簡略化のため、getText関数をここで定義します
-        function getText(key) {
-             return TEXTS[currentLang][key] || key;
-        }
-
-        // 商品データ (多言語対応)
+    // ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐
+    // ⚠️ ここに、あなたの元のindex.htmlからコピーした
+    // ⚠️ const products = [...] の完全な配列を貼り付けてください。
+    // ⚠️ (アサヒスーパードライから金沢和牛ロールまですべて)
         const products = [
             { code: '1101', name_ja: 'アサヒスーパードライ (330ml)', name_en: 'Asahi Super Dry (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
             { code: '1102', name_ja: 'アサヒ黒生 (330ml)', name_en: 'Asahi Kuro Nama (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
@@ -452,85 +345,459 @@ function selectTable(table) {
             { code: '5002', name_ja: 'フルーツ盛り合わせ (ビーガン)', name_en: 'Fruit Platter (Vegan)', price: 900, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '旬のフルーツ', notes_en: 'Seasonal fruits', isVegan: true, isCooked: false, hasAllergens: false },
         ];
 
-        // 🚨 修正箇所 3: sendOrder() 関数をRealtime Database対応で追加
-        /**
-         * 注文データをFirebase Realtime Databaseに送信する
-         */
-        function sendOrder() {
-            // 注文がゼロでないことを確認
-            const itemsCount = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
-            if (itemsCount === 0) {
-                showMessage(getText('message_error'), 'error'); 
-                return;
-            }
+    // ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐
 
-            // Realtime Databaseへの参照を取得
-            const db = firebase.database();
-            const ordersRef = db.ref('orders');
-            
-            // 注文内容を抽出（注文されたアイテム名の配列にする）
-            const orderItemsList = [];
-            for (const productId in cart) {
-                const product = products.find(p => p.code === productId);
-                if (product) {
-                    for (let i = 0; i < cart[productId].quantity; i++) {
-                        // kitchen.htmlで表示しやすいよう、ここでは商品名を使用
-                        orderItemsList.push(product[`name_${currentLang}`] || productId);
-                    }
-                } else {
-                    for (let i = 0; i < cart[productId].quantity; i++) {
-                        orderItemsList.push(productId);
-                    }
-                }
-            }
-            
-            // 送信するデータオブジェクト
-            const orderData = {
-                table: currentTable, // グローバル変数 currentTable を使用 (例: 'T1')
-                items: orderItemsList, // 注文されたアイテムのリスト (例: ['アサヒ', '和牛ステーキ'])
-                status: 'pending', 
-                created_at: Date.now() // 送信時刻 (ミリ秒)
-            };
 
-            // Firebaseの 'orders' パスに新しい注文を書き込む
-            ordersRef.push(orderData)
-                .then(() => {
-                    // 成功時の処理
-                    showMessage(getText('message_sent_success'), 'success');
-                    
-                    // カートとUIをリセット
-                    cart = {}; 
-                    currentTipRate = TIP_RATES[0]; 
-                    // renderAllUI()は他の関数に依存しているため、完全なコードがないためここでは省略
-                    // ユーザーの既存コードに任せるが、念のためUIリセットの主要な関数を呼ぶと想定
-                    // updateTotal();
-                    
-                    // 送信ボタンの無効化（UI制御関数があるはずだが、ここではDOM操作で直接制御）
-                    const sendBtn = document.getElementById('send-order-btn');
-                    sendBtn.disabled = true;
-                    sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                })
-                .catch((error) => {
-                    // 失敗時の処理
-                    console.error("Firebase送信エラー:", error);
-                    showMessage(getText('message_sent_failure') + '\n' + error.message, 'error');
-                });
+    // ------------------------------------------------------
+    // II. UI制御とロジック関数
+    // ------------------------------------------------------
+
+    /**
+     * 翻訳テキストを取得
+     */
+    function getText(key) {
+        return TEXTS[key] ? TEXTS[key][currentLang] : key;
+    }
+
+    /**
+     * 数値を通貨形式にフォーマット
+     */
+    function formatCurrency(amount) {
+        const formatter = new Intl.NumberFormat(currentLang === 'ja' ? 'ja-JP' : 'en-US', {
+            style: 'currency',
+            currency: 'JPY', // 日本円表示に統一
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        });
+        return formatter.format(amount);
+    }
+
+    /**
+     * メッセージモーダルを表示
+     */
+    function showMessage(text, type = 'success') {
+        const modal = document.getElementById('message-modal');
+        const messageText = document.getElementById('message-text');
+        
+        messageText.textContent = text;
+        
+        if (type === 'success') {
+            modal.style.backgroundColor = '#ecfdf5'; // 緑系の薄い背景
+            messageText.style.color = '#059669';    // 緑系の文字
+        } else {
+            modal.style.backgroundColor = '#fee2e2'; // 赤系の薄い背景
+            messageText.style.color = '#dc2626';    // 赤系の文字
         }
         
-        // ... (その他の既存関数: toggleLanguage, renderAllUI, etc. は省略) ...
+        modal.style.display = 'block';
+    }
+
+    /**
+     * カートの数量を更新
+     */
+    function updateQuantity(productId, change) {
+        const product = products.find(p => p.code === productId);
+        if (!product) return;
+
+        if (cart[productId]) {
+            cart[productId].quantity += change;
+        } else if (change > 0) {
+            cart[productId] = { 
+                product: product, 
+                quantity: change, 
+                price: product.price 
+            };
+        }
+
+        if (cart[productId] && cart[productId].quantity <= 0) {
+            delete cart[productId];
+        }
+
+        renderProductList();
+        updateTotal();
+    }
+
+    /**
+     * カートをクリア
+     */
+    function clearCart() {
+        if (Object.keys(cart).length === 0) return;
+
+        if (confirm(getText('confirm_clear'))) {
+            cart = {};
+            renderAllUI();
+        }
+    }
+    
+    /**
+     * ビーガンフィルタの切り替え
+     */
+    function toggleVeganFilter() {
+        isVeganFilterActive = !isVeganFilterActive;
+        currentCategory = getText('category_all'); // フィルタ変更時はカテゴリを「すべて」に戻す
+        renderAllUI();
+    }
+
+    /**
+     * テーブルを選択し、メインメニューを表示する
+     */
+    function selectTable(table) {
+        currentTable = table;
+        const overlay = document.getElementById('table-modal-overlay');
+        const mainContent = document.getElementById('main-content');
+        const mainFooter = document.getElementById('main-footer');
+
+        // モーダルを非表示にし、メインコンテンツを表示
+        overlay.style.display = 'none';
+        mainContent.style.display = 'block';
+        mainFooter.style.display = 'block';
+
+        // UIを初期化・更新
+        renderAllUI(); 
+    }
+
+    /**
+     * テーブル選択モーダルを表示し、テーブルボタンを描画する
+     */
+    function showTableModal() {
+        const modalOverlay = document.getElementById('table-modal-overlay');
+        const grid = document.getElementById('table-selection-grid');
+        const mainContent = document.getElementById('main-content');
+        const mainFooter = document.getElementById('main-footer');
         
-        // --- 初期化 ---(既存コードの一部)
-        document.addEventListener('DOMContentLoaded', () => {
-            currentCategory = getText('category_all');
+        // 既にテーブルが選択されている場合はスキップ
+        if (currentTable) {
+            modalOverlay.style.display = 'none';
+            mainContent.style.display = 'block';
+            mainFooter.style.display = 'block';
+            return;
+        }
+
+        // 1. メインコンテンツを非表示にする
+        mainContent.style.display = 'none';
+        mainFooter.style.display = 'none';
+        
+        // 2. モーダルを表示する (CSSの display: flex で表示を確定)
+        modalOverlay.style.display = 'flex'; 
+        
+        // 3. ボタンの描画ロジック
+        if (grid) {
+            grid.innerHTML = '';
+            TABLES.forEach(tableId => {
+                const button = document.createElement('button');
+                button.textContent = tableId;
+                button.className = `bg-primary-blue text-white font-bold text-2xl py-4 rounded-xl shadow-lg hover:bg-primary-hover transition duration-150 ease-in-out`;
+                button.onclick = () => selectTable(tableId);
+                grid.appendChild(button);
+            });
+        }
+        
+        document.getElementById('full-header-title').textContent = getText('select_table_title');
+    }
+
+    /**
+     * 言語を切り替える
+     */
+    function toggleLanguage() {
+        currentLang = currentLang === 'ja' ? 'en' : 'ja';
+        currentCategory = getText('category_all');
+        isVeganFilterActive = false; 
+        currentTipRate = TIP_RATES[0]; 
+        
+        renderAllUI();
+    }
+    
+    /**
+     * 全てのUIコンポーネントをレンダリング/更新
+     */
+    function renderAllUI() {
+        renderStaticElements();
+        renderFilterControls();
+        renderCategoryTabs();
+        renderProductList();
+        renderTipButtons(); 
+        updateTotal(); 
+    }
+
+    /**
+     * 画面上部の静的要素（ヘッダー、カートボタンのテキストなど）を更新
+     */
+    function renderStaticElements() {
+        // ヘッダータイトル（テーブルID表示）
+        if (currentTable) {
+            document.getElementById('full-header-title').innerHTML = 
+                `${getText('table_display')} ${currentTable} ${getText('header_title')}`;
+        } else {
+            document.getElementById('full-header-title').textContent = getText('select_table_title');
+        }
+
+        // 言語切り替えボタン
+        document.getElementById('lang-button').textContent = currentLang === 'ja' ? 'EN' : '日本語';
+
+        // その他の静的なHTML要素のテキスト更新
+        document.getElementById('cart-subtotal-label').textContent = getText('subtotal');
+        document.getElementById('cart-tax-label').textContent = getText('tax');
+        document.getElementById('cart-tip-label').textContent = getText('tip');
+        document.getElementById('cart-total-label').textContent = getText('total');
+        document.getElementById('send-order-button').textContent = getText('send_order');
+        document.getElementById('notes-label').textContent = getText('notes_label');
+        document.getElementById('clear-cart-button').textContent = getText('clear_cart');
+
+        // 注釈の更新
+        document.getElementById('notes-input').placeholder = getText('notes_placeholder');
+    }
+
+    /**
+     * フィルタリングコントロール（ビーガン、ソート）を更新
+     */
+    function renderFilterControls() {
+        const veganButton = document.getElementById('vegan-filter-button');
+        veganButton.textContent = getText('filter_vegan');
+        
+        // ビーガンフィルタボタンのスタイル更新
+        if (isVeganFilterActive) {
+            veganButton.classList.add('bg-green-600', 'text-white');
+            veganButton.classList.remove('bg-gray-200', 'text-gray-700');
+        } else {
+            veganButton.classList.add('bg-gray-200', 'text-gray-700');
+            veganButton.classList.remove('bg-green-600', 'text-white');
+        }
+    }
+
+    /**
+     * カテゴリタブをレンダリング/更新
+     */
+    function renderCategoryTabs() {
+        const categories = [getText('category_all'), ...new Set(products.map(p => p[`category_${currentLang}`]))];
+        const container = document.getElementById('category-tabs');
+        if (!container) return; // 要素がない場合はスキップ
+        
+        container.innerHTML = '';
+
+        categories.forEach(category => {
+            const button = document.createElement('button');
+            button.textContent = category;
+            button.className = `category-tab px-4 py-2 rounded-full font-medium transition duration-150 ease-in-out whitespace-nowrap text-sm`;
             
-            // 初回ロード時にテーブル選択モーダルを表示 (テーブル選択までメインコンテンツは隠れている)
-            showTableModal(); 
+            if (category === currentCategory) {
+                button.classList.add('bg-soft-red', 'text-white');
+            } else {
+                button.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-100');
+            }
+            
+            button.onclick = () => {
+                currentCategory = category;
+                renderAllUI();
+            };
+            container.appendChild(button);
         });
+    }
+
+    /**
+     * 現在のフィルタとカテゴリに基づき商品リストをレンダリング
+     */
+    function renderProductList() {
+        const container = document.getElementById('product-list');
+        if (!container) return;
+
+        container.innerHTML = '';
         
-    </script>
+        if (products.length === 0) {
+            container.innerHTML = `<p class="text-center text-gray-500 p-8">商品データが読み込まれていません。</p>`;
+            return;
+        }
+
+        // フィルタリングロジック
+        const filteredProducts = products.filter(product => {
+            const categoryMatch = currentCategory === getText('category_all') || 
+                                  product[`category_${currentLang}`] === currentCategory;
+            
+            const veganMatch = !isVeganFilterActive || product.isVegan;
+
+            return categoryMatch && veganMatch;
+        });
+
+        if (filteredProducts.length === 0) {
+            container.innerHTML = `<p class="text-center text-gray-500 p-8">${getText('not_found')}</p>`;
+            return;
+        }
+
+        // 商品カードの描画
+        filteredProducts.forEach(product => {
+            const productId = product.code;
+            const currentQty = cart[productId] ? cart[productId].quantity : 0;
+            
+            // アイコンのHTMLを生成
+            const iconHtml = `
+                ${product.isVegan ? `<span title="${getText('icon_vegan')}" class="text-icon-green text-lg mr-2">🟢</span>` : ''}
+                ${product.isCooked ? `<span title="${getText('icon_cooked')}" class="text-icon-yellow text-lg mr-2">🟡</span>` : ''}
+                ${product.hasAllergens ? `<span title="${getText('icon_allergy')}" class="text-icon-red text-lg">🔴</span>` : ''}
+            `;
+
+            const card = document.createElement('div');
+            card.className = "bg-white p-4 rounded-xl shadow-lg flex items-center justify-between";
+            card.innerHTML = `
+                <div class="flex items-center space-x-4">
+                    <img src="placeholder.jpg" alt="${product[`name_${currentLang}`]}" class="w-16 h-16 object-cover rounded-lg flex-shrink-0">
+                    <div>
+                        <h3 class="font-semibold text-gray-900">${product[`name_${currentLang}`]}</h3>
+                        <p class="text-sm text-gray-500">${product.notes_ja}</p>
+                        <p class="text-sm font-bold text-gray-700 mt-1">${formatCurrency(product.price)}</p>
+                        <div class="mt-1">${iconHtml}</div>
+                    </div>
+                </div>
+                
+                <div class="flex-shrink-0">
+                    <div class="flex items-center space-x-2">
+                        <button onclick="updateQuantity('${productId}', -1)" 
+                                class="qty-btn bg-gray-200 text-gray-700 hover:bg-gray-300 ${currentQty > 0 ? '' : 'opacity-50 cursor-not-allowed'}" 
+                                ${currentQty > 0 ? '' : 'disabled'}>
+                            -
+                        </button>
+                        <span id="qty-${productId}" class="text-xl font-bold w-10 text-center">
+                            ${currentQty}
+                        </span>
+                        <button onclick="updateQuantity('${productId}', 1)" 
+                                class="qty-btn bg-soft-red text-white hover:bg-red-600">
+                            +
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    /**
+     * チップ選択ボタンのレンダリング
+     */
+    function renderTipButtons() {
+        const container = document.getElementById('tip-buttons');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        TIP_RATES.forEach(rate => {
+            const button = document.createElement('button');
+            const percentage = rate * 100;
+            button.textContent = `${percentage}%`;
+            button.className = 'tip-button';
+            
+            if (rate === currentTipRate) {
+                button.classList.add('tip-selected');
+            }
+            
+            button.onclick = () => {
+                currentTipRate = rate;
+                renderAllUI();
+            };
+            container.appendChild(button);
+        });
+    }
+
+    /**
+     * カートの合計を更新し、画面に反映
+     */
+    function updateTotal() {
+        let subtotal = 0;
+        let totalQuantity = 0;
+        
+        // 小計と合計数量を計算
+        Object.values(cart).forEach(item => {
+            subtotal += item.price * item.quantity;
+            totalQuantity += item.quantity;
+        });
+
+        // 税金とチップを計算
+        const tax = subtotal * TAX_RATE;
+        const tip = subtotal * currentTipRate;
+        const total = subtotal + tax + tip;
+
+        // 画面に反映
+        document.getElementById('cart-subtotal-value').textContent = formatCurrency(subtotal);
+        document.getElementById('cart-tax-value').textContent = formatCurrency(tax);
+        document.getElementById('cart-tip-value').textContent = formatCurrency(tip);
+        document.getElementById('cart-total-value').textContent = formatCurrency(total);
+        
+        document.getElementById('cart-quantity-indicator').textContent = totalQuantity;
+
+        // 注文送信ボタンの有効化/無効化
+        const sendButton = document.getElementById('send-order-button');
+        if (totalQuantity > 0) {
+            sendButton.disabled = false;
+            sendButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+            sendButton.disabled = true;
+            sendButton.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    /**
+     * 注文データをFirebase Realtime Databaseに送信する
+     */
+    function sendOrder() {
+        if (Object.keys(cart).length === 0 || !currentTable) return;
+        
+        const orderItems = Object.values(cart).map(item => ({
+            code: item.product.code,
+            name_ja: item.product.name_ja,
+            name_en: item.product.name_en,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.price * item.quantity
+        }));
+
+        let subtotal = 0;
+        Object.values(cart).forEach(item => { subtotal += item.price * item.quantity; });
+        const tax = subtotal * TAX_RATE;
+        const tip = subtotal * currentTipRate;
+        const total = subtotal + tax + tip;
+
+        const orderData = {
+            table: currentTable,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            status: 'NEW',
+            subtotal: subtotal,
+            tax: tax,
+            tip: tip,
+            total: total,
+            notes: document.getElementById('notes-input').value,
+            items: orderItems
+        };
+
+        const newOrderRef = db.ref('orders').push();
+        newOrderRef.set(orderData)
+            .then(() => {
+                // 成功時の処理
+                showMessage(getText('message_sent_success'), 'success');
+                cart = {}; // カートをクリア
+                document.getElementById('notes-input').value = ''; // 備考欄をクリア
+                renderAllUI();
+                
+                // 送信後にボタンを無効化
+                const sendButton = document.getElementById('send-order-button');
+                sendButton.disabled = true;
+                sendButton.classList.add('opacity-50', 'cursor-not-allowed');
+            })
+            .catch((error) => {
+                // 失敗時の処理
+                console.error("Firebase送信エラー:", error);
+                showMessage(getText('message_sent_failure') + '\n' + error.message, 'error');
+            });
+    }
+
+    // ------------------------------------------------------
+    // III. 初期化処理
+    // ------------------------------------------------------
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // 初期カテゴリを設定
+        currentCategory = getText('category_all');
+        
+        // 初回ロード時にテーブル選択モーダルを表示 (テーブル選択までメインコンテンツは隠れている)
+        showTableModal(); 
+    });
+</script>
 
 </body>
 </html>
-
-
-
