@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <base target="_top" />
+    <title>キッチン オーダー受信画面 (Firebase)</title>
+    <style>
+        /* 既存のスタイルを維持しつつ、一部修正 */
+        :root { --fg:#222; --muted:#666; --accent:#0b79d0; --bad:#c0392b; }
+        body { 
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "ヒラギノ角ゴ ProN", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+            margin: 16px; 
+            color: var(--fg); 
+        }
+        h1 { font-size: 24px; margin: 0 0 12px; }
+        .controls { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; }
+        .note { min-height: 1.2em; color: var(--muted); }
+        .note.bad { color: var(--bad); }
+        button { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; }
+        button:disabled { opacity: .6; cursor: default; }
+        select { padding: 4px 6px; }
+        table { border-collapse: collapse; width: 100%; max-width: 920px; }
+        th, td { border: 1px solid #ddd; padding: 10px 12px; font-size: 14px; text-align: left;}
+        th { background: #f7f7f7; }
+        .order-content { font-size: 16px; font-weight: 600; color: #0b79d0; }
+        .done-button { background:#4CAF50; color:white; border:none; border-radius: 4px; padding: 6px 8px; cursor: pointer; }
+        .done-button:hover { background:#45a049; }
+    </style>
+</head>
+<body>
+    <h1>新規オーダー一覧</h1>
+
+    <div class="controls">
+        <label>表示：</label>
+        <select id="filter" disabled>
+            <option value="notdone">未完了のみ (リアルタイム)</option>
+        </select>
+        <button id="btnReload">手動更新</button>
+        <span id="note" class="note">Firebase接続を待機中...</span>
+    </div>
+
+    <div id="list">
+        (注文を待機しています...)
+    </div>
+
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+ 
+<script>
+    // 2. Firebase SDK 初期化コード (あなたのプロジェクト情報)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBWVkm-z2b5Gc3NgaxRYqCArc3_1qGXt6M",
+        authDomain: "atsushi-menu-order.firebaseapp.com",
+        databaseURL: "https://atsushi-menu-order-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "atsushi-menu-order",
+        storageBucket: "atsushi-menu-order.firebasestorage.app",
+        messagingSenderId: "646826055037",
+        appId: "1:646826055037:web:67b13209ccd675326ee814",
+        measurementId: "G-ZL674LSY85"
+    };
+     
+    // 3. 接続の実行
+    firebase.initializeApp(firebaseConfig);
+
+    // Realtime Databaseへの参照を取得
+    const db = firebase.database();
+    const ordersRef = db.ref('orders');
+    
+    // 画面メモ表示（既存の関数を流用）
+    function setNote(text, isError){
+        var n = document.getElementById('note');
+        if (n) {
+            n.textContent = text || '';
+            n.className = isError ? 'note bad' : 'note';
+        }
+    }
+    function setLoading(on){ setNote(on ? 'データ読み込み中...' : 'リアルタイム監視中'); }
+
+
+    // 完了ボタンが押された時の処理
+    function markAsDone(orderId, orderTable) {
+        if (!confirm(`テーブル${orderTable}の注文 (ID: ${orderId}) を完了し、一覧から削除しますか？`)) {
+            return;
+        }
+        setNote('完了処理中...');
+        // 注文をデータベースから削除する
+        ordersRef.child(orderId).remove()
+            .then(() => {
+                setNote(`テーブル${orderTable}の注文を完了し、削除しました。`, false);
+            })
+            .catch(error => {
+                setNote('完了処理エラー: ' + error.message, true);
+            });
+    }
+
+    // 一覧描画（Firebaseデータ形式に合わせて修正）
+    function renderList(rows){
+        const wrap = document.getElementById('list');
+        wrap.innerHTML = '';
+        if (!rows || !rows.length){
+            wrap.innerHTML = '<div class="empty">(現在、未完了の注文はありません)</div>';
+            return;
+        }
+
+        // rowsをテーブル番号でソート（昇順）
+        rows.sort((a, b) => {
+             // 'T1'から数字だけを取り出して比較
+            const tableA = parseInt(a.table.replace('T', ''), 10);
+            const tableB = parseInt(b.table.replace('T', ''), 10);
+            return tableA - tableB;
+        });
+
+        const tbl = document.createElement('table');
+        tbl.className = 'list';
+        
+        // ヘッダー作成
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th style="width: 80px;">完了</th>
+                <th style="width: 100px;">テーブル</th>
+                <th>注文内容</th>
+                <th style="width: 150px;">送信時刻</th>
+            </tr>`;
+        tbl.appendChild(thead);
+        
+        // ボディ作成
+        const tbody = document.createElement('tbody');
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            
+            // 注文内容の表示: itemsが配列だと仮定
+            // r.itemsの形式は index.html の送信データ形式に依存します
+            const orderItems = Array.isArray(r.items) ? r.items.join(', ') : '内容不明';
+            
+            // 日付の整形 (ミリ秒のタイムスタンプ r.created_at を想定)
+            const created = r.created_at ? new Date(r.created_at).toLocaleTimeString('ja-JP', {
+                 hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) : 'N/A';
+
+            tr.innerHTML = `
+                <td>
+                    <button class="done-button" onclick="markAsDone('${r.order_id}', '${r.table}')">完了</button>
+                </td>
+                <td style="font-size: 18px; font-weight: bold;">${r.table || 'N/A'}</td>
+                <td class="order-content">${orderItems}</td>
+                <td>${created}</td>`;
+            tbody.appendChild(tr);
+        });
+        tbl.appendChild(tbody);
+        wrap.appendChild(tbl);
+    }
+    
+    // ⭐⭐⭐ リアルタイム監視処理（Google Apps Scriptの代わりに動作） ⭐⭐⭐
+    function listenForOrders() {
+        setLoading(true);
+        setNote('接続中...', false);
+
+        // 'orders'パスのデータが変更されるたびに自動的に実行される（リアルタイム）
+        ordersRef.on('value', (snapshot) => {
+            setLoading(false);
+            setNote('リアルタイム監視中', false);
+            
+            const ordersData = snapshot.val(); 
+
+            if (!ordersData) {
+                renderList([]);
+                return;
+            }
+
+            const rows = [];
+            // Firebaseから取得したオブジェクトを配列に変換
+            for (const orderId in ordersData) {
+                const order = ordersData[orderId];
+                // Firebaseのキー (注文ID) をデータとして含める
+                order.order_id = orderId; 
+                rows.push(order);
+            }
+            
+            // 最新のデータを画面に描画
+            renderList(rows); 
+        }, (error) => {
+            setLoading(false);
+            setNote('NG: データベース読み込みエラー: ' + error.message, true);
+        });
+    }
+
+    // 初期ロードと手動更新のイベント設定
+    document.getElementById('btnReload').addEventListener('click', listenForOrders);
+    window.addEventListener('DOMContentLoaded', listenForOrders);
+
+</script>
+</body>
+</html>
