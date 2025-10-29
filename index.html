@@ -101,6 +101,61 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     
     <script>
+        /**
+ * テーブル選択モーダルを表示し、テーブルボタンを描画する
+ */
+function showTableModal() {
+    const overlay = document.getElementById('table-modal-overlay');
+    const grid = document.getElementById('table-selection-grid');
+    const mainContent = document.getElementById('main-content');
+    const mainFooter = document.getElementById('main-footer');
+    
+    // 既にテーブルが選択されている場合は何もしない
+    if (currentTable) {
+        overlay.style.display = 'none';
+        mainContent.style.display = 'block';
+        mainFooter.style.display = 'block';
+        return;
+    }
+
+    // テーブルボタンを描画
+    grid.innerHTML = TABLES.map(table => `
+        <button onclick="selectTable('${table}')" 
+                class="bg-primary-blue text-white font-bold text-2xl py-4 rounded-xl shadow-lg hover:bg-primary-hover transition duration-150 ease-in-out">
+            ${table}
+        </button>
+    `).join('');
+
+    overlay.style.display = 'flex'; // モーダルを表示
+    mainContent.style.display = 'none';
+    mainFooter.style.display = 'none';
+    
+    // ヘッダーのタイトルを「テーブルを選択中...」に設定
+    document.getElementById('full-header-title').textContent = getText('select_table_title');
+}
+
+/**
+ * テーブルを選択し、メインメニューを表示する
+ * @param {string} table - 選択されたテーブルID (例: 'T1')
+ */
+function selectTable(table) {
+    currentTable = table;
+    const overlay = document.getElementById('table-modal-overlay');
+    const mainContent = document.getElementById('main-content');
+    const mainFooter = document.getElementById('main-footer');
+
+    // ヘッダーを更新
+    document.getElementById('full-header-title').innerHTML = 
+        `${getText('table_display')} ${currentTable} ${getText('header_title')}`;
+
+    // モーダルを非表示にし、メインコンテンツを表示
+    overlay.style.display = 'none';
+    mainContent.style.display = 'block';
+    mainFooter.style.display = 'block';
+
+    // UIを初期化・更新
+    renderAllUI(); 
+}
         // 🚨 以前のコードで未定義だった関数を定義
         function showMessage(text, type) {
             const box = document.getElementById('message-box');
@@ -473,28 +528,8 @@
         });
         
     </script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-<script>
-  // ③ 初期化スクリプト
-  // 【firebaseConfig】: あなたのプロジェクトIDやAPIキーなどが含まれています
-const firebaseConfig = {
- apiKey: "AIzaSyBWVkm-z2b5Gc3NgaxRYqCArc3_1qGXt6M",
- authDomain: "atsushi-menu-order.firebaseapp.com",
- databaseURL: "https://atsushi-menu-order-default-rtdb.asia
-southeast1.firebasedatabase.app",
- projectId: "atsushi-menu-order",
- storageBucket: "atsushi-menu-order.firebasestorage.app",
- messagingSenderId: "646826055037",
- appId: "1:646826055037:web:67b13209ccd675326ee814",
- measurementId: "G-ZL674LSY85"
-};
-
-  // ④ 接続の実行：この行が非常に重要です
-  firebase.initializeApp(firebaseConfig);
-</script>
-    
 </body>
 </html>
+
 
