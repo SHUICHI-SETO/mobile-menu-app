@@ -259,6 +259,8 @@
                 table_display: 'テーブル:',
                 // 夜間料金のテキスト
                 night_surcharge_text: '夜間料金 (22時以降 10%)', 
+                // ★追加: 画像なしのテキスト
+                image_not_found: '画像なし'
             },
             'en': {
                 header_title: ' Order',
@@ -289,11 +291,12 @@
                 table_display: 'Table:',
                 // 夜間料金のテキスト
                 night_surcharge_text: 'Night Surcharge (After 10 PM 10%)', 
+                // ★追加: 画像なしのテキスト
+                image_not_found: 'No image file'
             }
         };
 
         // 【重要】ここを新しいメニューデータに置き換えてください
-        // 商品データの構造: { code, name_ja, name_en, price, category_ja, category_en, notes_ja, notes_en, isVegan, isCooked, hasAllergens }
         const products = [
             { code: '1101', name_ja: 'アサヒスーパードライ (330ml)', name_en: 'Asahi Super Dry (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
             { code: '1102', name_ja: 'アサヒ黒生 (330ml)', name_en: 'Asahi Kuro Nama (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
@@ -408,8 +411,19 @@
              return TEXTS[currentLang][key] || key;
         }
         
+        /**
+         * 金額を現在選択されている言語の通貨形式でフォーマットする
+         */
         function formatCurrency(amount) {
-            return `¥${amount.toLocaleString()}`;
+            const formattedAmount = amount.toLocaleString();
+            
+            if (currentLang === 'ja') {
+                // 日本語の場合: ¥500
+                return `¥${formattedAmount}`;
+            } else {
+                // 英語の場合: 500 yen
+                return `${formattedAmount} yen`;
+            }
         }
 
         function findProductByCode(code) {
@@ -582,17 +596,24 @@
                 const nameKey = currentLang === 'ja' ? 'name_ja' : 'name_en';
                 const notesKey = currentLang === 'ja' ? 'notes_ja' : 'notes_en';
 
-                // サムネイル表示のためのHTML構造
-                // 🚨 画像は /img/product_[商品コード].jpg というパスを想定しています。
+                // ★修正箇所: 画像ロードエラー時に代替テキストを表示するロジック
                 const imagePath = `img/product_${product.code}.jpg`; 
                 const imageHTML = `
-                    <div class="w-20 h-20 bg-gray-200 flex-shrink-0 overflow-hidden rounded-lg">
-                        <img src="${imagePath}" 
+                    <div id="thumb-container-${product.code}" class="w-20 h-20 bg-gray-200 flex-shrink-0 overflow-hidden rounded-lg relative">
+                        <img id="img-${product.code}" src="${imagePath}" 
                             alt="${product[nameKey]} ${getText('image_text')}" 
                             class="w-full h-full object-cover"
-                            onerror="this.parentElement.style.display='none'; this.closest('.flex').classList.add('space-x-0', 'pl-0');">
+                            onerror="document.getElementById('img-${product.code}').style.display='none'; 
+                                     document.getElementById('no-img-${product.code}').style.display='flex';">
+                        
+                        <div id="no-img-${product.code}" 
+                             class="absolute inset-0 flex items-center justify-center text-center text-xs text-gray-500 font-semibold p-1 leading-tight"
+                             style="display: none;">
+                            ${getText('image_not_found')}
+                        </div>
                     </div>
                 `;
+                // ★修正箇所ここまで
 
                 const productHTML = `
                     <div class="bg-white p-4 rounded-xl shadow-lg flex space-x-4 cursor-pointer hover:shadow-xl transition" onclick="showDetailModal('${product.code}')">
@@ -862,4 +883,3 @@
 
 </body>
 </html>
-
