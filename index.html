@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -13,15 +14,6 @@
             background-color: #eef1f5; 
         }
         
-        /* カスタムカラー設定 */
-        .bg-primary-blue { background-color: #3b82f6; } /* 青 */
-        .hover\:bg-primary-hover:hover { background-color: #2563eb; } /* 濃い青 */
-        .text-primary-blue { color: #3b82f6; }
-        .bg-icon-green { background-color: #10b981; } /* 緑 */
-        .text-icon-green { color: #10b981; }
-        .text-icon-yellow { color: #f59e0b; } /* 黄 */
-        .bg-soft-red { background-color: #ef4444; } /* 赤 */
-
         /* チップ選択ボタンのカスタムスタイル */
         .tip-label { flex-grow: 1; text-align: center; }
         .tip-button {
@@ -37,118 +29,206 @@
             width: 100%;
         }
         .tip-button.tip-selected {
-            background-color: #3b82f6;
-            color: white;
+            background-color: #dbeafe;
             border-color: #3b82f6;
-            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5), 0 2px 4px -2px rgba(59, 130, 246, 0.5);
+            color: #1e40af;
+            box-shadow: 0 0 0 1px #3b82f6;
         }
-        .tip-button.tip-unselected:hover {
-            background-color: #f3f4f6;
+        /* 数量コントロールボタン */
+        .qty-btn {
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s;
+        }
+        .qty-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* カテゴリタブのコンテナ */
+        #category-tabs::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+        #category-tabs {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        
+        /* モーダル背景 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* モーダルコンテンツ */
+        .modal-content {
+            z-index: 1001;
         }
     </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#3b82f6',
+                        'primary-hover': '#2563eb',
+                        'soft-red': '#ef4444',
+                        'icon-green': '#10b981',
+                        'icon-yellow': '#f59e0b',
+                        'icon-red': '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="pb-32">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <script>
+        // --- 基本的なヘルパー/UI関数 ---
+        function showMessage(text, type) {
+            const box = document.getElementById('message-box');
+            if (!box) return;
+            box.textContent = text;
+            box.className = `fixed bottom-24 right-4 p-4 max-w-xs rounded-xl shadow-2xl transition-opacity duration-300 opacity-100 font-semibold whitespace-pre-line z-50 text-sm ${type === 'error' ? 'bg-soft-red text-white' : 'bg-icon-green text-white'}`;
+            setTimeout(() => {
+                box.classList.remove('opacity-100');
+                box.classList.add('opacity-0');
+            }, 3000);
+        }
+        
+        function hideModal(id) {
+            const modal = document.getElementById(id);
+            if(modal) modal.style.display = 'none';
+        }
 
-    <div id="table-modal-overlay" class="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" style="display: none;">
-        <div id="table-modal-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm text-center">
+        // Firebase初期化 (このブロックは元のコードのまま維持)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWVkm-z2b5Gc3NgaxRYqCArc3_1qGXt6M",
+            authDomain: "atsushi-menu-order.firebaseapp.com",
+            databaseURL: "https://atsushi-menu-order-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "atsushi-menu-order",
+            storageBucket: "atsushi-menu-order.firebasestorage.app",
+            messagingSenderId: "646826055037",
+            appId: "1:646826055037:web:67b13209ccd675326ee814",
+            measurementId: "G-ZL674LSY85"
+        };
+        firebase.initializeApp(firebaseConfig);
+    </script>
+    
+    <div id="table-modal-overlay" class="modal-overlay">
+        <div class="modal-content bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">テーブルを選択してください</h2>
+            <div id="table-selection-grid" class="grid grid-cols-2 gap-4">
+                </div>
+            <p class="text-sm text-center text-gray-500 mt-6">
+                ※一度選択すると、注文を送信するまでテーブルは変更できません。
+            </p>
+        </div>
+    </div>
+    
+    <div id="main-content" class="max-w-xl mx-auto p-4 hidden">
+        <header class="mb-4">
+            <div class="flex justify-between items-center mb-3">
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800">
+                    <span id="full-header-title">テーブルを選択中...</span>
+                </h1>
+                <button id="lang-toggle-btn" onclick="toggleLanguage()" class="bg-white border border-gray-300 text-gray-700 text-sm py-1 px-3 rounded-lg shadow-sm hover:bg-gray-50 transition">English</button>
+            </div>
+            <p id="header-subtitle" class="text-sm text-gray-500 border-b pb-3">タッチして注文数を入力してください。</p>
+        </header>
+
+        <div id="filter-controls" class="flex justify-between items-center mb-4">
+            </div>
+
+        <div id="category-tabs" class="flex overflow-x-scroll whitespace-nowrap space-x-2 mb-6 p-1">
+            </div>
+
+        <div id="product-list" class="grid grid-cols-1 gap-6">
+            </div>
+
+        <div id="message-box" class="fixed bottom-24 right-4 p-4 max-w-xs rounded-xl shadow-2xl transition-opacity duration-300 opacity-0 bg-green-600 text-white font-semibold whitespace-pre-line z-50 text-sm">
             </div>
     </div>
 
-    <header id="main-header" class="bg-white shadow-md sticky top-0 z-10 hidden">
-        <div class="max-w-xl mx-auto px-4 py-3 flex justify-between items-center">
-            <h1 id="full-header-title" class="text-xl font-extrabold text-gray-900">
-                </h1>
-            <button id="lang-toggle" class="text-sm font-semibold text-primary-blue" onclick="toggleLanguage()">
-                </button>
-        </div>
-    </header>
-
-    <main id="main-content" class="flex-grow pt-4 pb-4 px-4 overflow-auto hidden">
+    <footer id="main-footer" class="fixed bottom-0 left-0 right-0 bg-white shadow-2xl border-t border-gray-200 p-4 z-40 hidden">
         <div class="max-w-xl mx-auto">
+            <button id="tip-detail-toggle" class="text-sm text-primary-blue font-semibold mb-2 hover:underline" onclick="toggleTipDetails()">
+                チップ/料金詳細を閉じる (Hide Details)
+            </button>
             
-            <div class="mb-4 flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-gray-800" id="menu-title">メニュー</h2>
-                <button id="vegan-filter-button" 
-                    class="flex items-center space-x-1 px-3 py-1.5 text-sm font-semibold rounded-full bg-gray-300 hover:bg-gray-400 transition-colors"
-                    onclick="toggleVeganFilter()">
-                    <span id="filter-label"></span>
+            <div id="tip-detail-box" class="p-3 bg-gray-50 rounded-lg mb-3 text-sm transition-all duration-300">
+                <div id="tip-selection-area" class="mb-3">
+                    <p class="font-semibold mb-2" id="tip-selection-label">チップ率を選択してください:</p>
+                    <div id="tip-buttons-container" class="flex space-x-2">
+                        </div>
+                </div>
+                <p><span id="subtotal-text">小計</span>: <span id="subtotal-display">¥0</span></p>
+                <p id="night-surcharge-row" class="hidden font-semibold text-gray-700">
+                    <span id="night-surcharge-text">夜間料金 (22時以降 10%)</span>: 
+                    <span id="night-surcharge-display">¥0</span>
+                </p>
+                <p><span id="tip-text">チップ (0%)</span>: <span id="tip-amount-display">¥0</span></p>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <div>
+                    <p id="total-amount-label" class="text-sm text-gray-500">合計請求額</p>
+                    <p id="total-amount-display" class="text-3xl font-extrabold text-gray-900">¥0</p>
+                    <p id="summary-points" class="text-xs text-gray-500 mt-1">0点 (小計: ¥0)</p>
+                </div>
+                <button id="send-order-btn" onclick="sendOrder()"
+                        class="bg-soft-red text-white font-extrabold py-3 px-8 rounded-xl 
+                               hover:bg-red-600 active:bg-red-700 transition duration-150 ease-in-out shadow-lg text-lg opacity-50 cursor-not-allowed"
+                               disabled>
+                    注文を送信
                 </button>
             </div>
-
-            <div class="overflow-x-auto whitespace-nowrap py-2 mb-4">
-                <div id="category-tabs" class="flex space-x-3">
-                    </div>
-            </div>
-
-            <div id="product-list" class="space-y-3 pb-4">
-                </div>
-            
-        </div>
-    </main>
-
-    <footer id="main-footer" class="bg-white shadow-2xl p-4 sticky bottom-0 z-10 hidden">
-        <div class="max-w-xl mx-auto">
-            
-            <div class="flex justify-between items-center mb-3">
-                <span id="item-count" class="text-sm font-semibold text-gray-600">
-                    </span>
-                <div id="message-area" class="text-xs font-semibold"></div>
-            </div>
-
-            <div class="px-4 py-2 text-center">
-                <button id="tip-detail-toggle" class="text-xs text-gray-500 hover:text-gray-700 font-semibold mb-2" onclick="toggleTipDetails()">
-                    </button>
-            </div>
-
-            <div id="tip-details-box" class="px-4 pb-2 hidden">
-                <p id="tip-rate-label" class="text-sm font-semibold mb-2 text-gray-600 text-center">チップ率を選択してください:</p>
-                
-                <div id="tip-buttons" class="flex space-x-2 mb-4">
-                    </div>
-
-                <div class="flex justify-between items-center text-sm mb-1">
-                    <span id="subtotal-label" class="text-gray-600">小計</span>
-                    <span id="subtotal-amount" class="font-semibold text-gray-800">0円</span>
-                </div>
-                <div class="flex justify-between items-center text-sm mb-2 border-b pb-2">
-                    <span id="tip-label" class="text-gray-600">チップ</span>
-                    <span id="tip-amount" class="font-semibold text-primary-blue">0円</span>
-                </div>
-            </div>
-
-            <div class="flex justify-between items-center text-xl font-extrabold mb-4 pt-2">
-                <span id="total-label" class="text-gray-800">合計請求額</span>
-                <span id="total-amount" class="text-primary-blue">0円</span>
-            </div>
-
-            <button id="order-btn" disabled 
-                class="w-full py-4 text-xl font-bold rounded-xl shadow-lg transition-colors bg-gray-400 text-white cursor-not-allowed"
-                onclick="sendOrder()">
-                </button>
         </div>
     </footer>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
     <script>
-        // ------------------------------------------------------
-        // I. 定数とグローバル変数の定義
-        // ------------------------------------------------------
+        // --- 定数定義 ---
         const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
-        const TAX_RATE = 0.10; 
         const TIP_RATES = [0, 10, 15, 20]; 
         const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        // 夜間料金の定数
+        const NIGHT_SURCHARGE_RATE = 0.10; // 夜間料金率 10%
+        const NIGHT_SURCHARGE_THRESHOLD = 22; // 夜間料金が適用される時間 (22時以降)
 
         // 状態管理
-        let currentTable = null; 
         let currentLang = 'ja'; 
-        let isVeganFilterActive = false;
-        let currentCategory = 'すべて';
-        let currentTipRate = TIP_RATES[0]; 
+        let currentTable = null; 
+        let currentCategory = 'すべて'; 
         let cart = {}; 
+        let isVeganFilterActive = false;
+        let currentTipRate = TIP_RATES[0]; 
+        let isTipDetailsVisible = true; // 初期表示は開いていると仮定
 
-        // UIテキストの多言語対応データ
+        // ユーザー要望のカテゴリリスト (タブの表示順)
+        const CATEGORY_TABS = {
+            'ja': ['すべて', 'Drink', 'Appetizer', 'Roll', 'Nigiri', 'Dessert', 'Vegan'],
+            'en': ['All', 'Drink', 'Appetizer', 'Roll', 'Nigiri', 'Dessert', 'Vegan']
+        };
+
+        // 静的テキストの多言語辞書
         const TEXTS = {
             'ja': {
                 header_title: 'の注文',
@@ -165,11 +245,11 @@
                 footer_send: '注文を送信',
                 detail_close: 'チップ/料金詳細を閉じる',
                 detail_open: 'チップ/料金詳細を開く',
-                tip_label: 'チップ率を選択してください:',
-                tip_none: 'なし',
+                tip_label: 'チップ率を選択してください:', 
+                tip_none: 'なし', 
                 message_error: 'エラー: カートに商品がありません。',
                 message_sent_success: '注文がキッチンに送信されました！',
-                message_sent_failure: '注文送信に失敗しました。',
+                message_sent_failure: '注文送信に失敗しました。', 
                 icon_vegan: 'ビーガン',
                 icon_cooked: '調理済',
                 icon_allergy: 'アレルギー',
@@ -177,6 +257,8 @@
                 image_text: '商品画像',
                 select_table_title: 'テーブルを選択中...',
                 table_display: 'テーブル:',
+                // 夜間料金のテキスト
+                night_surcharge_text: '夜間料金 (22時以降 10%)', 
             },
             'en': {
                 header_title: ' Order',
@@ -193,11 +275,11 @@
                 footer_send: 'Send Order',
                 detail_close: 'Hide Tip/Fee Details',
                 detail_open: 'Show Tip/Fee Details',
-                tip_label: 'Select Tip Percentage:',
-                tip_none: 'None',
+                tip_label: 'Select Tip Percentage:', 
+                tip_none: 'None', 
                 message_error: 'Error: Cart is empty.',
                 message_sent_success: 'Order sent to the kitchen!',
-                message_sent_failure: 'Order failed to send.',
+                message_sent_failure: 'Order failed to send.', 
                 icon_vegan: 'Vegan',
                 icon_cooked: 'Cooked',
                 icon_allergy: 'Allergens',
@@ -205,636 +287,534 @@
                 image_text: 'Product Image',
                 select_table_title: 'Selecting Table...',
                 table_display: 'Table:',
+                // 夜間料金のテキスト
+                night_surcharge_text: 'Night Surcharge (After 10 PM 10%)', 
             }
         };
 
-        // Firebaseの設定
-        const firebaseConfig = {
-            apiKey: "AIzaSyBWVkm-z2b5Gc3NgaxRYqCArc3_1qGXt6M",
-            authDomain: "atsushi-menu-order.firebaseapp.com",
-            databaseURL: "https://atsushi-menu-order-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "atsushi-menu-order",
-            storageBucket: "atsushi-menu-order.firebasestorage.app",
-            messagingSenderId: "646826055037",
-            appId: "1:646826055037:web:67b13209ccd675326ee814",
-            measurementId: "G-ZL674LSY85"
-        };
-        
-        // ------------------------------------------------------
-        // II. 商品データ (const products) の定義 (ここに最新のデータを挿入)
-        // ------------------------------------------------------
-const products = [
-    { code: '1101', name_ja: 'アサヒスーパードライ (330ml)', name_en: 'Asahi Super Dry (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1102', name_ja: 'アサヒ黒生 (330ml)', name_en: 'Asahi Kuro Nama (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1121', name_ja: 'ブラッディ・マリー', name_en: 'Bloody Mary', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウォッカ、トマトジュース、タバスコ', notes_en: 'Vodka, Tomato Juice, Tobasco', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1122', name_ja: 'スクリュー・ドライバー', name_en: 'Screwdriver', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウォッカ、オレンジジュース、オレンジスライス', notes_en: 'Vodka, Orange Juice, Orange Slice', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1123', name_ja: 'オレンジ・ブーム', name_en: 'Orange Boom', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'オレンジリキュール、オレンジジュース', notes_en: 'Orange Liqueur, Orange Juice', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1124', name_ja: 'ブルーラグーン', name_en: 'Blue Lagoon', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウォッカ、ブルーキュラソー、スプライト、レモン', notes_en: 'Vodka, Blue Curacao Liqueur, Sprite, Lemon', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1125', name_ja: 'メロン・ブーム', name_en: 'Melon Boom', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'メロンリキュール、メロンソーダ', notes_en: 'Melon Liqueur, Melon Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1126', name_ja: 'グリーン・ドラゴン', name_en: 'Green Dragon', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グリーンリキュール、ジンジャーソーダ', notes_en: 'Green Liqueur, Ginger Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1127', name_ja: 'ストロベリー・ブーム', name_en: 'Strawberry Boom', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ストロベリーリキュール、ストロベリーソーダ', notes_en: 'Strawberry Liqueur, Strawberry Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1128', name_ja: 'ウィスキーコーク', name_en: 'Whiskey Cola', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウィスキー、コーラ', notes_en: 'Whiskey, Cola', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1129', name_ja: 'グリーン・ドラゴン', name_en: 'Green Dragon', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グリーンリキュール、ジンジャーソーダ', notes_en: 'Green Liqueur, Ginger Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1130', name_ja: 'ウィスキーソーダ (ハイボール)', name_en: 'Whiskey with Soda (Japanese Highball)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウィスキー、ソーダ、レモン', notes_en: 'Whiskey, Soda, Lemon', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1131', name_ja: '梅酒ソーダ', name_en: 'Umeshu Soda (Plum Wine)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '加賀梅酒', notes_en: 'Plum Wine Kagaumeshu', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1132', name_ja: '梅酒ロック', name_en: 'Umeshu on the rocks (Plum Wine)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '加賀梅酒', notes_en: 'Plum Wine Kagaumeshu', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1211', name_ja: '赤ワイン (グラス 125ml)', name_en: 'Red Wine (Glass 125ml)', price: 650, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グラスワイン', notes_en: 'Glass Wine', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1212', name_ja: '白ワイン (グラス 125ml)', name_en: 'White Wine (Glass 125ml)', price: 650, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グラスワイン', notes_en: 'Glass Wine', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1311', name_ja: '菊姫 (日本酒 180ml)', name_en: 'Kikuhime (Sake 180ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:2.5', notes_en: 'Sake, Alcohol Bitterness Scale:2.5 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1312', name_ja: '池月 (日本酒 180ml)', name_en: 'Ikezuki (Sake 180ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:3.8', notes_en: 'Sake, Alcohol Bitterness Scale:3.8 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1313', name_ja: '手取川 (日本酒 180ml)', name_en: 'Tedorigawa (Sake 180ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:8.0', notes_en: 'Sake, Alcohol Bitterness Scale:8.0 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1314', name_ja: '加賀鳶 (日本酒 180ml)', name_en: 'Kagatobi (Sake 180 ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:8.5', notes_en: 'Sake, Alcohol Bitterness Scale:8.5 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1315', name_ja: '加賀鶴 (日本酒 180 ml)', name_en: 'Kagatsuru (Sake 180 ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:9.5', notes_en: 'Sake, Alcohol Bitterness Scale:9.5 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1411', name_ja: 'スペイン白ワイン (ボトル) セリカデッロ・ゴデーリョ', name_en: 'Sericadello Godello y Dona Blanca (Spanish white wine bottle)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ゴデーリョとドーニャブランカのブレンド。バターとローストナッツのヒントがある、フルーティーでクリーミーな味わい。', notes_en: 'A typical fish for this region consisting of Godello and Doña Blanca. This wine shows yellow that aromas with a hint of butter and roasted nuts, and a slight note of vanilla. The taste is full and creamy.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1412', name_ja: 'イタリア白ワイン (ボトル) フェウド・アランチョ インツォリア', name_en: 'FREDDO ARANCIO Inzolia (Italian white wine bottle)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'シチリア産。桃とアプリコットの香りがスムーズに溶け込む、フルーティーでエレガントな白ワイン。', notes_en: 'Notes of peach and apricot blend smoothly in Sicily and tradition. Harmonious and elegant white wine - this fine mix, which surprises with its fruity elegance. Fresh and mineral.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1413', name_ja: 'フランス白ワイン (ボトル) シャブリ', name_en: 'Chef Selectas Chablis (French white wine bottle)', price: 7600, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'フランス、ブルゴーニュ地方の辛口白ワイン。シャープで刺激的なシャルドネのワイン。', notes_en: 'Chablis is a dry wine made in Burgundy, France and it is made in the Chablis district. It is a crisp wine that has such stimulating the chardonnay grapes. Chablis is never sweet.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1414', name_ja: 'イタリア赤ワイン (ボトル) ドモード モンテプルチアーノ・ダブルッツォ（メディアム）', name_en: 'Domodo Montepulciano d\'Abruzzo (Italian red wine Medium body)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'オーガニックのイタリアンワイン。ミディアムボディでフルーティーな味わい。', notes_en: 'It is an organic Italian wine, medium fruit taste.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1415', name_ja: 'フランス赤ワイン (ボトル) コート・デュ・ローヌ (フルボディ)', name_en: 'Cotes du Rhone Vieilles Vignes (French red wine Full body)', price: 6200, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'クラシックな南ローヌの特徴を示すフルボディの赤。ブラックフルーツとリコリスのヒント、長い余韻。', notes_en: 'A full-bodied red showing classic southern Rhone characters. Layered with black fruit, hints of liquorice and a long finish. Pair with black pepper and boldly fierce. Smooth and assertive.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1416', name_ja: 'オーストラリア赤ワイン (ボトル) バロッサ・シラーズ (フルボディ)', name_en: 'Peter Lehmann BAROSSAN SHIRAZ (Australian red wine Full body)', price: 8900, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'フレンチ＆アメリカンオークで12ヶ月熟成されたフルボディ。チョコレートとモカの甘いノートが豊富。', notes_en: 'A full-bodied wine aged for 12 months in French and American oak barrels. It is intense and richly layered with sweet notes of chocolate and mocha, and the characteristic sweetness of the Barossa.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1417', name_ja: 'スペイン スパークリングワイン (ボトル) フレシネ・コルドン・ネグロ', name_en: 'Freixenet X Cava (Spanish sparkling wine & Champagne)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'カバ (スペインのスパークリングワイン)。シャンパンと同じ製法で造られた、クリスプでバランスの取れた味わい。', notes_en: 'Cava is a Spanish sparkling wine. A crisp, clean and well-balanced Cava, Freixenet Cava is made with the same method as Champagne. It may bring a long finish and an exciting rush of orange.', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1511', name_ja: '抹茶 (ホット)', name_en: 'Matcha Green Tea (Hot)', price: 800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本の伝統的な抹茶。調理済みの温かい飲み物。', notes_en: 'The traditional Japanese style Green Tea. Please ask for details.', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1512', name_ja: 'ジャスミン茶 (ホット)', name_en: 'Jasmine Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1513', name_ja: '緑茶 (ホット)', name_en: 'Green Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1514', name_ja: 'ウーロン茶 (ホット)', name_en: 'Oolong Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1515', name_ja: 'ジャスミン茶 (ホット)', name_en: 'Jasmine Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1516', name_ja: '日本式ジャスミン茶 (ホット)', name_en: 'Japanese Jasmine Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1517', name_ja: '英国風紅茶 (ホット)', name_en: 'English Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ブラックティー、英国式', notes_en: 'Black tea, British-style tea.', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '1518', name_ja: 'ブレンドコーヒー (ホット)', name_en: 'Blended Coffee (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: false, hasAllergens: false }, // コーヒーは通常ビーガン
-    { code: '1611', name_ja: 'コカ・コーラ', name_en: 'Coca Cola', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1612', name_ja: 'コカ・コーラ ゼロ', name_en: 'Coca Cola ZERO', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1613', name_ja: 'ジンジャーエール', name_en: 'Ginger ale', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1614', name_ja: 'ファンタ オレンジ', name_en: 'Fanta Orange', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1615', name_ja: 'オレンジジュース', name_en: 'Orange Juice', price: 600, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1616', name_ja: 'ミルク (アイス)', name_en: 'Milk (Iced)', price: 600, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物、乳製品', notes_en: 'Cold Drink, Dairy', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '1617', name_ja: 'ウーロン茶 (アイス)', name_en: 'Oolong Tea (Iced)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1711', name_ja: 'アサヒ ドライゼロ (ノンアルコール)', name_en: 'Asahi ZERO (Non‑alcohol Beer)', price: 550, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ノンアルコールビール', notes_en: 'Non‑alcohol', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1712', name_ja: '天然水 500ml', name_en: 'Natural Mineral Water 500ml', price: 350, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ボトル', notes_en: 'Bottle', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1713', name_ja: '炭酸水 500ml', name_en: 'Carbonated Water 500ml', price: 350, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ボトル', notes_en: 'Bottle', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '1811', name_ja: 'チョコレートアイスクリーム', name_en: 'Chocolate Ice Cream', price: 500, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '乳製品、卵を含む', notes_en: 'Dessert, Contains dairy, eggs', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '1812', name_ja: 'バニラアイスクリーム', name_en: 'Vanilla Ice Cream', price: 500, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '乳製品、卵を含む', notes_en: 'Dessert, Contains dairy, eggs', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '2111', name_ja: '刺身盛り合わせ', name_en: 'Sashimi Moriawase', price: 2800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '板長おまかせの刺身', notes_en: 'Chef\'s choice sashimi', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '2112', name_ja: '和牛ステーキ (約150g)', name_en: 'Wagyu Stake (about 150g)', price: 5500, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '牛肉', notes_en: 'Beef', isVegan: false, isCooked: true, hasAllergens: false },
-    { code: '2113', name_ja: 'カニ味噌汁', name_en: 'Kani-miso Soup', price: 1150, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '蟹味噌使用', notes_en: 'Soup, Crab miso', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '2114', name_ja: '枝豆', name_en: 'Edamame', price: 550, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '若採り大豆の茹でたて', notes_en: 'Young soybeans typically boiled and salted.', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '2115', name_ja: '揚げ出し豆腐', name_en: 'Agedashi Tofu', price: 650, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '揚げ豆腐。だしに魚介類、小麦が含まれる可能性あり。', notes_en: 'Deep-fried Tofu. Broth may contain seafood and wheat.', isVegan: true, isCooked: true, hasAllergens: true },
-    { code: '2116', name_ja: '冷奴', name_en: 'Hiyayakko (Cold Tofu)', price: 450, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '冷たい豆腐。醤油/タレに注意。', notes_en: 'Cold Tofu. Be mindful of soy sauce/sauce.', isVegan: true, isCooked: false, hasAllergens: true },
-    { code: '2117', name_ja: '焼ききのこ', name_en: 'Grilled Mushrooms', price: 650, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'グリル調理', notes_en: 'Grilled preparation', isVegan: true, isCooked: true, hasAllergens: true },
-    { code: '2118', name_ja: 'ナス天', name_en: 'Nasu Ten (Eggplant)', price: 800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'ナスの天ぷら。小麦、揚げ油を使用。', notes_en: 'Eggplant tempura. Contains wheat and frying oil.', isVegan: true, isCooked: true, hasAllergens: true },
-    { code: '2119', name_ja: 'アボカドミックスサラダ', name_en: 'Avocado Mix Salad', price: 1800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'ドレッシングに注意', notes_en: 'Be mindful of the dressing', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '2120', name_ja: 'ロスティ (スイス風ハッシュドポテト)', name_en: 'Rosti (Swiss Hash Browns)', price: 1500, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '加熱調理', notes_en: 'Cooked preparation', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '2121', name_ja: 'サーモンカルパッチョ', name_en: 'Salmon Carpaccio', price: 2400, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '生魚', notes_en: 'Raw fish', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '2122', name_ja: '海老のバターソテー', name_en: 'Shrimp Butter Saute', price: 1700, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '海老、バター使用', notes_en: 'Shrimp, butter used', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '2123', name_ja: '帆立のバターソテー', name_en: 'Scallop Butter Saute', price: 1850, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '帆立、バター使用', notes_en: 'Scallop, butter used', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3111', name_ja: '金沢和牛ゴールドロール', name_en: 'KANAZAWA Wagyu Gold Roll', price: 5800, category_ja: '巻物', category_en: 'Roll', notes_ja: '24K金箔、和牛、アボカド、チーズ、きゅうり。調理済み。', notes_en: '24k gold, wagyu beef, avocado, cheese, cucumber. Cooked.', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3112', name_ja: 'グリーンタイガーロール', name_en: 'Green Tiger Roll', price: 2850, category_ja: '巻物', category_en: 'Roll', notes_ja: '海老天ぷら、アボカド、スパイシーツナ、きゅうり', notes_en: 'Prawn Tempura, Avocado, Spicy Tuna, Cucumber', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3113', name_ja: 'ドラゴンロール', name_en: 'Dragon Roll', price: 3100, category_ja: '巻物', category_en: 'Roll', notes_ja: '鰻、アボカド、カニカマ、きゅうり、卵サラダ', notes_en: 'Eel, Avocado, Surimi, Cucumber, Egg salad', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3114', name_ja: '海老サラダロール', name_en: 'Ebi Salad Roll', price: 2200, category_ja: '巻物', category_en: 'Roll', notes_ja: '海老天ぷら、海老、きゅうり、サラダ', notes_en: 'Shrimp Tempura, Shrimp, Cucumber, Salad', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3115', name_ja: 'キャタピラーロール', name_en: 'Caterpillar Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、とびこトッピング', notes_en: 'Avocado, Surimi, Cucumber; flying fish roes as topping', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3116', name_ja: 'アトランティックロール', name_en: 'Atlantic Roll', price: 2300, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、サーモン', notes_en: 'Avocado, Surimi, Cucumber, Salmon', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3211', name_ja: 'ツナラバーロール', name_en: 'Tuna lover Roll', price: 2800, category_ja: '巻物', category_en: 'Roll', notes_ja: 'ツナ、きゅうり', notes_en: 'Tuna, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3212', name_ja: 'サーモンラバーロール', name_en: 'Salmon lover Roll', price: 2500, category_ja: '巻物', category_en: 'Roll', notes_ja: 'サーモン、きゅうり', notes_en: 'Salmon, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3213', name_ja: 'レインボーロール', name_en: 'Rainbow Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、様々なトッピング', notes_en: 'Avocado, Surimi, Cucumber; various topping', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3214', name_ja: 'フィッシュパーティロール', name_en: 'Fish Party Roll', price: 2600, category_ja: '巻物', category_en: 'Roll', notes_ja: '様々な鮮魚', notes_en: 'Various fresh fish', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3215', name_ja: 'アラスカロール', name_en: 'Alaska Roll', price: 2500, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、サーモン', notes_en: 'Avocado, Surimi, Cucumber; Salmon', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3216', name_ja: 'サーモンフィラデルフィアロール', name_en: 'Salmon Philadelphia Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'クリームチーズ、サーモン、アボカド、きゅうり', notes_en: 'Cream cheese, Salmon, Avocado, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3217', name_ja: 'スパイシーツナホタテロール', name_en: 'Spicy Tuna Scallop Roll', price: 2600, category_ja: '巻物', category_en: 'Roll', notes_ja: 'スパイシーツナ、チリホタテ', notes_en: 'Spicy tuna, Scallop with chili', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3218', name_ja: 'ホタテロール', name_en: 'Scallop Roll', price: 2500, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、ホタテ', notes_en: 'Avocado, Surimi, Cucumber, Scallop', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3219', name_ja: 'タイガーロール', name_en: 'Tiger Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、海老、きゅうり', notes_en: 'Avocado, Shrimp, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '3311', name_ja: 'スパイダーロール', name_en: 'Spider Roll', price: 2950, category_ja: '巻物', category_en: 'Roll', notes_ja: 'ソフトシェルクラブ、マヨネーズ', notes_en: 'Soft shell crab, mayo', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3312', name_ja: 'テリマヨサーモンロール', name_en: 'Terri-mayo Salmon Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: '焼ききのこ、きゅうり、サーモン、照り焼きマヨ', notes_en: 'Grilled mushroom, cucumber, salmon, teriyaki mayo', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3313', name_ja: '天ぷらロール', name_en: 'Tempura Roll', price: 2700, category_ja: '巻物', category_en: 'Roll', notes_ja: '各種魚介と野菜の天ぷら', notes_en: 'Various seafood & vegetable tempura', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3314', name_ja: 'エビ天クランチロール', name_en: 'Ebiten Crunch Roll', price: 2000, category_ja: '巻物', category_en: 'Roll', notes_ja: '海老天ぷら、クランチ天かす', notes_en: 'Prawn Tempura, Crunch Tempura', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '3411', name_ja: 'ベジ・キャタピラーロール', name_en: 'Vege‑Caterpillar Roll', price: 2800, category_ja: '巻物', category_en: 'Roll', notes_ja: '炒めたネギ、きのこ、サラダ', notes_en: 'Sautéed green onions, mushrooms, salad', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '3412', name_ja: 'ベジ・冷奴', name_en: 'Vege - Hiyayakko', price: 450, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '冷たい新鮮な豆腐', notes_en: 'Cold fresh tofu', isVegan: true, isCooked: false, hasAllergens: true },
-    { code: '3413', name_ja: '揚げ出し豆腐 (ビーガン)', name_en: 'Agedashi Tofu', price: 650, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'きのこベースの出汁を使った揚げ豆腐', notes_en: 'Deep-fried Tofu with Mushroom-based dashi sauce', isVegan: true, isCooked: true, hasAllergens: true },
-    { code: '3414', name_ja: 'ミニグリーンサラダ', name_en: 'Mini-Green Salad', price: 800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '小さな野菜サラダ。ドレッシングに注意。', notes_en: 'Small plate of vegetable salad', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '3415', name_ja: 'ベジ・天ぷらロール', name_en: 'Vege‑Tempura Roll', price: 2700, category_ja: '巻物', category_en: 'Roll', notes_ja: '野菜の天ぷらロール。小麦を使用。', notes_en: 'Vegetable tempura', isVegan: true, isCooked: true, hasAllergens: true },
-    { code: '3416', name_ja: 'ご飯 (石川県産)', name_en: 'Gohan (Rice)', price: 450, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '白米。石川県産。', notes_en: 'White Rice. These rice are product of Ishikawa prefecture', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '3417', name_ja: '枝豆 (ビーガン)', name_en: 'Edamame', price: 550, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '若採り大豆を茹でて塩を振ったもの。', notes_en: 'Young soybeans typically boiled and salted.', isVegan: true, isCooked: true, hasAllergens: false },
-    { code: '3511', name_ja: '吸い物', name_en: 'Sumashi Jiru', price: 900, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '伝統的な日本の魚だしスープ', notes_en: 'Traditional Japanese fish broth soup', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '4111', name_ja: 'にぎり寿司セット (6貫)', name_en: 'Nigiri Sushi Set (6)', price: 3100, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '板長おまかせ', notes_en: 'Chef\'s selection', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4112', name_ja: 'トロ握り', name_en: 'Toro Nigiri', price: 800, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '大トロ/中トロ', notes_en: 'Fatty tuna', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4113', name_ja: 'マグロ握り', name_en: 'Tuna Nigiri', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '赤身', notes_en: 'Tuna', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4114', name_ja: 'サーモン握り', name_en: 'Salmon Nigiri', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '生サーモン', notes_en: 'Salmon', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4115', name_ja: 'ハマチ握り', name_en: 'Hamachi Nigiri', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'ハマチ', notes_en: 'Yellow tail', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4116', name_ja: 'かいわれ握り', name_en: 'Kaiware Nigiri', price: 200, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '大根の新芽', notes_en: 'Radish sprouts', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '4117', name_ja: '生海老握り', name_en: 'Namaebi Nigiri', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '生海老', notes_en: 'Raw shrimp', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4118', name_ja: '蒸し海老握り', name_en: 'Mushi‑ebi Nigiri', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '蒸し海老', notes_en: 'Steamed shrimp', isVegan: false, isCooked: true, hasAllergens: true },
-    { code: '4119', name_ja: 'ホタテ握り', name_en: 'Hotate Nigiri', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'ホタテ貝', notes_en: 'Scallop', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4120', name_ja: 'スパイシーツナ軍艦', name_en: 'Spicy Tuna Gunkan', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'スパイシーなマグロのたたき', notes_en: 'Spicy Tuna Tartare', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4211', name_ja: '太巻き', name_en: 'Futo Maki', price: 2500, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '魚介類とサラダの太巻き', notes_en: 'Thick roll with seafood and salad', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4311', name_ja: 'かっぱ巻き', name_en: 'Kappa Maki', price: 450, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'きゅうりの細巻', notes_en: 'Cucumber thin roll', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '4312', name_ja: 'アボカド細巻き', name_en: 'Avocado Hosomaki', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'アボカドの細巻', notes_en: 'Avocado thin roll', isVegan: true, isCooked: false, hasAllergens: false },
-    { code: '4313', name_ja: '鉄火巻き', name_en: 'Tekka Maki', price: 650, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'マグロの細巻', notes_en: 'Tuna thin roll', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4314', name_ja: 'サーモン細巻き', name_en: 'Salmon Hosomaki', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'サーモンの細巻', notes_en: 'Salmon thin roll', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '4315', name_ja: 'アラスカロール', name_en: 'Alaska Roll', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'サーモン、アボカド、きゅうり', notes_en: 'Salmon, Avocado, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '5001', name_ja: '抹茶アイスクリーム', name_en: 'Matcha Ice Cream', price: 700, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '京都産抹茶使用。乳製品、卵を含む。', notes_en: 'Made with Kyoto Matcha. Contains dairy, eggs.', isVegan: false, isCooked: false, hasAllergens: true },
-    { code: '5002', name_ja: 'フルーツ盛り合わせ (ビーガン)', name_en: 'Fruit Platter (Vegan)', price: 900, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '旬のフルーツ', notes_en: 'Seasonal fruits', isVegan: true, isCooked: false, hasAllergens: false },
-];
+        // 【重要】ここを新しいメニューデータに置き換えてください
+        // 商品データの構造: { code, name_ja, name_en, price, category_ja, category_en, notes_ja, notes_en, isVegan, isCooked, hasAllergens }
+        const products = [
+            { code: '1101', name_ja: 'アサヒスーパードライ (330ml)', name_en: 'Asahi Super Dry (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1102', name_ja: 'アサヒ黒生 (330ml)', name_en: 'Asahi Kuro Nama (330ml)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ビール', notes_en: 'Beer', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1121', name_ja: 'ブラッディ・マリー', name_en: 'Bloody Mary', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウォッカ、トマトジュース、タバスコ', notes_en: 'Vodka, Tomato Juice, Tobasco', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1122', name_ja: 'スクリュー・ドライバー', name_en: 'Screwdriver', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウォッカ、オレンジジュース、オレンジスライス', notes_en: 'Vodka, Orange Juice, Orange Slice', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1123', name_ja: 'オレンジ・ブーム', name_en: 'Orange Boom', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'オレンジリキュール、オレンジジュース', notes_en: 'Orange Liqueur, Orange Juice', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1124', name_ja: 'ブルーラグーン', name_en: 'Blue Lagoon', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウォッカ、ブルーキュラソー、スプライト、レモン', notes_en: 'Vodka, Blue Curacao Liqueur, Sprite, Lemon', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1125', name_ja: 'メロン・ブーム', name_en: 'Melon Boom', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'メロンリキュール、メロンソーダ', notes_en: 'Melon Liqueur, Melon Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1126', name_ja: 'グリーン・ドラゴン', name_en: 'Green Dragon', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グリーンリキュール、ジンジャーソーダ', notes_en: 'Green Liqueur, Ginger Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1127', name_ja: 'ストロベリー・ブーム', name_en: 'Strawberry Boom', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ストロベリーリキュール、ストロベリーソーダ', notes_en: 'Strawberry Liqueur, Strawberry Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1128', name_ja: 'ウィスキーコーク', name_en: 'Whiskey Cola', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウィスキー、コーラ', notes_en: 'Whiskey, Cola', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1129', name_ja: 'グリーン・ドラゴン', name_en: 'Green Dragon', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グリーンリキュール、ジンジャーソーダ', notes_en: 'Green Liqueur, Ginger Soda Juice', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1130', name_ja: 'ウィスキーソーダ (ハイボール)', name_en: 'Whiskey with Soda (Japanese Highball)', price: 850, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ウィスキー、ソーダ、レモン', notes_en: 'Whiskey, Soda, Lemon', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1131', name_ja: '梅酒ソーダ', name_en: 'Umeshu Soda (Plum Wine)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '加賀梅酒', notes_en: 'Plum Wine Kagaumeshu', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1132', name_ja: '梅酒ロック', name_en: 'Umeshu on the rocks (Plum Wine)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '加賀梅酒', notes_en: 'Plum Wine Kagaumeshu', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1211', name_ja: '赤ワイン (グラス 125ml)', name_en: 'Red Wine (Glass 125ml)', price: 650, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グラスワイン', notes_en: 'Glass Wine', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1212', name_ja: '白ワイン (グラス 125ml)', name_en: 'White Wine (Glass 125ml)', price: 650, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'グラスワイン', notes_en: 'Glass Wine', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1311', name_ja: '菊姫 (日本酒 180ml)', name_en: 'Kikuhime (Sake 180ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:2.5', notes_en: 'Sake, Alcohol Bitterness Scale:2.5 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1312', name_ja: '池月 (日本酒 180ml)', name_en: 'Ikezuki (Sake 180ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:3.8', notes_en: 'Sake, Alcohol Bitterness Scale:3.8 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1313', name_ja: '手取川 (日本酒 180ml)', name_en: 'Tedorigawa (Sake 180ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:8.0', notes_en: 'Sake, Alcohol Bitterness Scale:8.0 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1314', name_ja: '加賀鳶 (日本酒 180ml)', name_en: 'Kagatobi (Sake 180 ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:8.5', notes_en: 'Sake, Alcohol Bitterness Scale:8.5 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1315', name_ja: '加賀鶴 (日本酒 180 ml)', name_en: 'Kagatsuru (Sake 180 ml)', price: 950, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本酒、アルコール度数:9.5', notes_en: 'Sake, Alcohol Bitterness Scale:9.5 (MAX 10)', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1411', name_ja: 'スペイン白ワイン (ボトル) セリカデッロ・ゴデーリョ', name_en: 'Sericadello Godello y Dona Blanca (Spanish white wine bottle)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ゴデーリョとドーニャブランカのブレンド。バターとローストナッツのヒントがある、フルーティーでクリーミーな味わい。', notes_en: 'A typical fish for this region consisting of Godello and Doña Blanca. This wine shows yellow that aromas with a hint of butter and roasted nuts, and a slight note of vanilla. The taste is full and creamy.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1412', name_ja: 'イタリア白ワイン (ボトル) フェウド・アランチョ インツォリア', name_en: 'FREDDO ARANCIO Inzolia (Italian white wine bottle)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'シチリア産。桃とアプリコットの香りがスムーズに溶け込む、フルーティーでエレガントな白ワイン。', notes_en: 'Notes of peach and apricot blend smoothly in Sicily and tradition. Harmonious and elegant white wine - this fine mix, which surprises with its fruity elegance. Fresh and mineral.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1413', name_ja: 'フランス白ワイン (ボトル) シャブリ', name_en: 'Chef Selectas Chablis (French white wine bottle)', price: 7600, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'フランス、ブルゴーニュ地方の辛口白ワイン。シャープで刺激的なシャルドネのワイン。', notes_en: 'Chablis is a dry wine made in Burgundy, France and it is made in the Chablis district. It is a crisp wine that has such stimulating the chardonnay grapes. Chablis is never sweet.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1414', name_ja: 'イタリア赤ワイン (ボトル) ドモード モンテプルチアーノ・ダブルッツォ（メディアム）', name_en: 'Domodo Montepulciano d\'Abruzzo (Italian red wine Medium body)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'オーガニックのイタリアンワイン。ミディアムボディでフルーティーな味わい。', notes_en: 'It is an organic Italian wine, medium fruit taste.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1415', name_ja: 'フランス赤ワイン (ボトル) コート・デュ・ローヌ (フルボディ)', name_en: 'Cotes du Rhone Vieilles Vignes (French red wine Full body)', price: 6200, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'クラシックな南ローヌの特徴を示すフルボディの赤。ブラックフルーツとリコリスのヒント、長い余韻。', notes_en: 'A full-bodied red showing classic southern Rhone characters. Layered with black fruit, hints of liquorice and a long finish. Pair with black pepper and boldly fierce. Smooth and assertive.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1416', name_ja: 'オーストラリア赤ワイン (ボトル) バロッサ・シラーズ (フルボディ)', name_en: 'Peter Lehmann BAROSSAN SHIRAZ (Australian red wine Full body)', price: 8900, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'フレンチ＆アメリカンオークで12ヶ月熟成されたフルボディ。チョコレートとモカの甘いノートが豊富。', notes_en: 'A full-bodied wine aged for 12 months in French and American oak barrels. It is intense and richly layered with sweet notes of chocolate and mocha, and the characteristic sweetness of the Barossa.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1417', name_ja: 'スペイン スパークリングワイン (ボトル) フレシネ・コルドン・ネグロ', name_en: 'Freixenet X Cava (Spanish sparkling wine & Champagne)', price: 3800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'カバ (スペインのスパークリングワイン)。シャンパンと同じ製法で造られた、クリスプでバランスの取れた味わい。', notes_en: 'Cava is a Spanish sparkling wine. A crisp, clean and well-balanced Cava, Freixenet Cava is made with the same method as Champagne. It may bring a long finish and an exciting rush of orange.', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1511', name_ja: '抹茶 (ホット)', name_en: 'Matcha Green Tea (Hot)', price: 800, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '日本の伝統的な抹茶。調理済みの温かい飲み物。', notes_en: 'The traditional Japanese style Green Tea. Please ask for details.', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1512', name_ja: 'ジャスミン茶 (ホット)', name_en: 'Jasmine Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1513', name_ja: '緑茶 (ホット)', name_en: 'Green Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1514', name_ja: 'ウーロン茶 (ホット)', name_en: 'Oolong Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1515', name_ja: 'ジャスミン茶 (ホット)', name_en: 'Jasmine Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1516', name_ja: '日本式ジャスミン茶 (ホット)', name_en: 'Japanese Jasmine Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1517', name_ja: '英国風紅茶 (ホット)', name_en: 'English Tea (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ブラックティー、英国式', notes_en: 'Black tea, British-style tea.', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '1518', name_ja: 'ブレンドコーヒー (ホット)', name_en: 'Blended Coffee (Hot)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '温かい飲み物', notes_en: 'Hot Drink', isVegan: true, isCooked: false, hasAllergens: false }, // コーヒーは通常ビーガン
+            { code: '1611', name_ja: 'コカ・コーラ', name_en: 'Coca Cola', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1612', name_ja: 'コカ・コーラ ゼロ', name_en: 'Coca Cola ZERO', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1613', name_ja: 'ジンジャーエール', name_en: 'Ginger ale', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1614', name_ja: 'ファンタ オレンジ', name_en: 'Fanta Orange', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1615', name_ja: 'オレンジジュース', name_en: 'Orange Juice', price: 600, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1616', name_ja: 'ミルク (アイス)', name_en: 'Milk (Iced)', price: 600, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物、乳製品', notes_en: 'Cold Drink, Dairy', isVegan: false, isCooked: false, hasAllergens: true }, 
+            { code: '1617', name_ja: 'ウーロン茶 (アイス)', name_en: 'Oolong Tea (Iced)', price: 450, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: '冷たい飲み物', notes_en: 'Cold Drink', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1711', name_ja: 'アサヒ ドライゼロ (ノンアルコール)', name_en: 'Asahi ZERO (Non‑alcohol Beer)', price: 550, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ノンアルコールビール', notes_en: 'Non‑alcohol', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1712', name_ja: '天然水 500ml', name_en: 'Natural Mineral Water 500ml', price: 350, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ボトル', notes_en: 'Bottle', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1713', name_ja: '炭酸水 500ml', name_en: 'Carbonated Water 500ml', price: 350, category_ja: 'ドリンク', category_en: 'Drink', notes_ja: 'ボトル', notes_en: 'Bottle', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '1811', name_ja: 'チョコレートアイスクリーム', name_en: 'Chocolate Ice Cream', price: 500, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '乳製品、卵を含む', notes_en: 'Dessert, Contains dairy, eggs', isVegan: false, isCooked: false, hasAllergens: true }, 
+            { code: '1812', name_ja: 'バニラアイスクリーム', name_en: 'Vanilla Ice Cream', price: 500, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '乳製品、卵を含む', notes_en: 'Dessert, Contains dairy, eggs', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '2111', name_ja: '刺身盛り合わせ', name_en: 'Sashimi Moriawase', price: 2800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '板長おまかせの刺身', notes_en: 'Chef\'s choice sashimi', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '2112', name_ja: '和牛ステーキ (約150g)', name_en: 'Wagyu Stake (about 150g)', price: 5500, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '牛肉', notes_en: 'Beef', isVegan: false, isCooked: true, hasAllergens: false },
+            { code: '2113', name_ja: 'カニ味噌汁', name_en: 'Kani-miso Soup', price: 1150, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '蟹味噌使用', notes_en: 'Soup, Crab miso', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '2114', name_ja: '枝豆', name_en: 'Edamame', price: 550, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '若採り大豆の茹でたて', notes_en: 'Young soybeans typically boiled and salted.', isVegan: true, isCooked: true, hasAllergens: false }, 
+            { code: '2115', name_ja: '揚げ出し豆腐', name_en: 'Agedashi Tofu', price: 650, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '揚げ豆腐。だしに魚介類、小麦が含まれる可能性あり。', notes_en: 'Deep-fried Tofu. Broth may contain seafood and wheat.', isVegan: true, isCooked: true, hasAllergens: true },
+            { code: '2116', name_ja: '冷奴', name_en: 'Hiyayakko (Cold Tofu)', price: 450, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '冷たい豆腐。醤油/タレに注意。', notes_en: 'Cold Tofu. Be mindful of soy sauce/sauce.', isVegan: true, isCooked: false, hasAllergens: true },
+            { code: '2117', name_ja: '焼ききのこ', name_en: 'Grilled Mushrooms', price: 650, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'グリル調理', notes_en: 'Grilled preparation', isVegan: true, isCooked: true, hasAllergens: true },
+            { code: '2118', name_ja: 'ナス天', name_en: 'Nasu Ten (Eggplant)', price: 800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'ナスの天ぷら。小麦、揚げ油を使用。', notes_en: 'Eggplant tempura. Contains wheat and frying oil.', isVegan: true, isCooked: true, hasAllergens: true },
+            { code: '2119', name_ja: 'アボカドミックスサラダ', name_en: 'Avocado Mix Salad', price: 1800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'ドレッシングに注意', notes_en: 'Be mindful of the dressing', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '2120', name_ja: 'ロスティ (スイス風ハッシュドポテト)', name_en: 'Rosti (Swiss Hash Browns)', price: 1500, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '加熱調理', notes_en: 'Cooked preparation', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '2121', name_ja: 'サーモンカルパッチョ', name_en: 'Salmon Carpaccio', price: 2400, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '生魚', notes_en: 'Raw fish', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '2122', name_ja: '海老のバターソテー', name_en: 'Shrimp Butter Saute', price: 1700, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '海老、バター使用', notes_en: 'Shrimp, butter used', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '2123', name_ja: '帆立のバターソテー', name_en: 'Scallop Butter Saute', price: 1850, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '帆立、バター使用', notes_en: 'Scallop, butter used', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3111', name_ja: '金沢和牛ゴールドロール', name_en: 'KANAZAWA Wagyu Gold Roll', price: 5800, category_ja: '巻物', category_en: 'Roll', notes_ja: '24K金箔、和牛、アボカド、チーズ、きゅうり。調理済み。', notes_en: '24k gold, wagyu beef, avocado, cheese, cucumber. Cooked.', isVegan: false, isCooked: true, hasAllergens: true }, 
+            { code: '3112', name_ja: 'グリーンタイガーロール', name_en: 'Green Tiger Roll', price: 2850, category_ja: '巻物', category_en: 'Roll', notes_ja: '海老天ぷら、アボカド、スパイシーツナ、きゅうり', notes_en: 'Prawn Tempura, Avocado, Spicy Tuna, Cucumber', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3113', name_ja: 'ドラゴンロール', name_en: 'Dragon Roll', price: 3100, category_ja: '巻物', category_en: 'Roll', notes_ja: '鰻、アボカド、カニカマ、きゅうり、卵サラダ', notes_en: 'Eel, Avocado, Surimi, Cucumber, Egg salad', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3114', name_ja: '海老サラダロール', name_en: 'Ebi Salad Roll', price: 2200, category_ja: '巻物', category_en: 'Roll', notes_ja: '海老天ぷら、海老、きゅうり、サラダ', notes_en: 'Shrimp Tempura, Shrimp, Cucumber, Salad', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3115', name_ja: 'キャタピラーロール', name_en: 'Caterpillar Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、とびこトッピング', notes_en: 'Avocado, Surimi, Cucumber; flying fish roes as topping', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3116', name_ja: 'アトランティックロール', name_en: 'Atlantic Roll', price: 2300, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、サーモン', notes_en: 'Avocado, Surimi, Cucumber, Salmon', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3211', name_ja: 'ツナラバーロール', name_en: 'Tuna lover Roll', price: 2800, category_ja: '巻物', category_en: 'Roll', notes_ja: 'ツナ、きゅうり', notes_en: 'Tuna, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3212', name_ja: 'サーモンラバーロール', name_en: 'Salmon lover Roll', price: 2500, category_ja: '巻物', category_en: 'Roll', notes_ja: 'サーモン、きゅうり', notes_en: 'Salmon, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3213', name_ja: 'レインボーロール', name_en: 'Rainbow Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、様々なトッピング', notes_en: 'Avocado, Surimi, Cucumber; various topping', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3214', name_ja: 'フィッシュパーティロール', name_en: 'Fish Party Roll', price: 2600, category_ja: '巻物', category_en: 'Roll', notes_ja: '様々な鮮魚', notes_en: 'Various fresh fish', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3215', name_ja: 'アラスカロール', name_en: 'Alaska Roll', price: 2500, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、サーモン', notes_en: 'Avocado, Surimi, Cucumber; Salmon', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3216', name_ja: 'サーモンフィラデルフィアロール', name_en: 'Salmon Philadelphia Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'クリームチーズ、サーモン、アボカド、きゅうり', notes_en: 'Cream cheese, Salmon, Avocado, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3217', name_ja: 'スパイシーツナホタテロール', name_en: 'Spicy Tuna Scallop Roll', price: 2600, category_ja: '巻物', category_en: 'Roll', notes_ja: 'スパイシーツナ、チリホタテ', notes_en: 'Spicy tuna, Scallop with chili', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3218', name_ja: 'ホタテロール', name_en: 'Scallop Roll', price: 2500, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、カニカマ、きゅうり、ホタテ', notes_en: 'Avocado, Surimi, Cucumber, Scallop', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3219', name_ja: 'タイガーロール', name_en: 'Tiger Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: 'アボカド、海老、きゅうり', notes_en: 'Avocado, Shrimp, Cucumber', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '3311', name_ja: 'スパイダーロール', name_en: 'Spider Roll', price: 2950, category_ja: '巻物', category_en: 'Roll', notes_ja: 'ソフトシェルクラブ、マヨネーズ', notes_en: 'Soft shell crab, mayo', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3312', name_ja: 'テリマヨサーモンロール', name_en: 'Terri-mayo Salmon Roll', price: 2400, category_ja: '巻物', category_en: 'Roll', notes_ja: '焼ききのこ、きゅうり、サーモン、照り焼きマヨ', notes_en: 'Grilled mushroom, cucumber, salmon, teriyaki mayo', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3313', name_ja: '天ぷらロール', name_en: 'Tempura Roll', price: 2700, category_ja: '巻物', category_en: 'Roll', notes_ja: '各種魚介と野菜の天ぷら', notes_en: 'Various seafood & vegetable tempura', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3314', name_ja: 'エビ天クランチロール', name_en: 'Ebiten Crunch Roll', price: 2000, category_ja: '巻物', category_en: 'Roll', notes_ja: '海老天ぷら、クランチ天かす', notes_en: 'Prawn Tempura, Crunch Tempura', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '3411', name_ja: 'ベジ・キャタピラーロール', name_en: 'Vege‑Caterpillar Roll', price: 2800, category_ja: '巻物', category_en: 'Roll', notes_ja: '炒めたネギ、きのこ、サラダ', notes_en: 'Sautéed green onions, mushrooms, salad', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '3412', name_ja: 'ベジ・冷奴', name_en: 'Vege - Hiyayakko', price: 450, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '冷たい新鮮な豆腐', notes_en: 'Cold fresh tofu', isVegan: true, isCooked: false, hasAllergens: true },
+            { code: '3413', name_ja: '揚げ出し豆腐 (ビーガン)', name_en: 'Agedashi Tofu', price: 650, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: 'きのこベースの出汁を使った揚げ豆腐', notes_en: 'Deep-fried Tofu with Mushroom-based dashi sauce', isVegan: true, isCooked: true, hasAllergens: true },
+            { code: '3414', name_ja: 'ミニグリーンサラダ', name_en: 'Mini-Green Salad', price: 800, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '小さな野菜サラダ。ドレッシングに注意。', notes_en: 'Small plate of vegetable salad', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '3415', name_ja: 'ベジ・天ぷらロール', name_en: 'Vege‑Tempura Roll', price: 2700, category_ja: '巻物', category_en: 'Roll', notes_ja: '野菜の天ぷらロール。小麦を使用。', notes_en: 'Vegetable tempura', isVegan: true, isCooked: true, hasAllergens: true },
+            { code: '3416', name_ja: 'ご飯 (石川県産)', name_en: 'Gohan (Rice)', price: 450, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '白米。石川県産。', notes_en: 'White Rice. These rice are product of Ishikawa prefecture', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '3417', name_ja: '枝豆 (ビーガン)', name_en: 'Edamame', price: 550, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '若採り大豆を茹でて塩を振ったもの。', notes_en: 'Young soybeans typically boiled and salted.', isVegan: true, isCooked: true, hasAllergens: false },
+            { code: '3511', name_ja: '吸い物', name_en: 'Sumashi Jiru', price: 900, category_ja: '前菜/一品', category_en: 'Appetizer', notes_ja: '伝統的な日本の魚だしスープ', notes_en: 'Traditional Japanese fish broth soup', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '4111', name_ja: 'にぎり寿司セット (6貫)', name_en: 'Nigiri Sushi Set (6)', price: 3100, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '板長おまかせ', notes_en: 'Chef\'s selection', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4112', name_ja: 'トロ握り', name_en: 'Toro Nigiri', price: 800, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '大トロ/中トロ', notes_en: 'Fatty tuna', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4113', name_ja: 'マグロ握り', name_en: 'Tuna Nigiri', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '赤身', notes_en: 'Tuna', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4114', name_ja: 'サーモン握り', name_en: 'Salmon Nigiri', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '生サーモン', notes_en: 'Salmon', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4115', name_ja: 'ハマチ握り', name_en: 'Hamachi Nigiri', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'ハマチ', notes_en: 'Yellow tail', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4116', name_ja: 'かいわれ握り', name_en: 'Kaiware Nigiri', price: 200, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '大根の新芽', notes_en: 'Radish sprouts', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '4117', name_ja: '生海老握り', name_en: 'Namaebi Nigiri', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '生海老', notes_en: 'Raw shrimp', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4118', name_ja: '蒸し海老握り', name_en: 'Mushi‑ebi Nigiri', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '蒸し海老', notes_en: 'Steamed shrimp', isVegan: false, isCooked: true, hasAllergens: true },
+            { code: '4119', name_ja: 'ホタテ握り', name_en: 'Hotate Nigiri', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'ホタテ貝', notes_en: 'Scallop', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4120', name_ja: 'スパイシーツナ軍艦', name_en: 'Spicy Tuna Gunkan', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'スパイシーなマグロのたたき', notes_en: 'Spicy Tuna Tartare', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4211', name_ja: '太巻き', name_en: 'Futo Maki', price: 2500, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: '魚介類とサラダの太巻き', notes_en: 'Thick roll with seafood and salad', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4311', name_ja: 'かっぱ巻き', name_en: 'Kappa Maki', price: 450, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'きゅうりの細巻', notes_en: 'Cucumber thin roll', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '4312', name_ja: 'アボカド細巻き', name_en: 'Avocado Hosomaki', price: 550, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'アボカドの細巻', notes_en: 'Avocado thin roll', isVegan: true, isCooked: false, hasAllergens: false },
+            { code: '4313', name_ja: '鉄火巻き', name_en: 'Tekka Maki', price: 650, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'マグロの細巻', notes_en: 'Tuna thin roll', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '4314', name_ja: 'サーモン細巻き', name_en: 'Salmon Hosomaki', price: 600, category_ja: 'にぎり', category_en: 'Nigiri', notes_ja: 'サーモンの細巻', notes_en: 'Salmon thin roll', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '5001', name_ja: '抹茶アイスクリーム', name_en: 'Matcha Ice Cream', price: 700, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '京都産抹茶使用。乳製品、卵を含む。', notes_en: 'Made with Kyoto Matcha. Contains dairy, eggs.', isVegan: false, isCooked: false, hasAllergens: true },
+            { code: '5002', name_ja: 'フルーツ盛り合わせ (ビーガン)', name_en: 'Fruit Platter (Vegan)', price: 900, category_ja: 'デザート', category_en: 'Dessert', notes_ja: '旬のフルーツ', notes_en: 'Seasonal fruits', isVegan: true, isCooked: false, hasAllergens: false },
+        ];
 
-        // ------------------------------------------------------
-        // III. UI制御とロジック関数 (変更なし)
-        // ------------------------------------------------------
-        
-        /**
-         * 翻訳テキストを取得
-         */
+        // --- ヘルパー関数 ---
+
         function getText(key) {
-            return TEXTS[currentLang][key] || key;
+             return TEXTS[currentLang][key] || key;
         }
         
-        /**
-         * メッセージ表示
-         */
-        function showMessage(text, type) {
-            const messageArea = document.getElementById('message-area');
-            if (!messageArea) return;
-            
-            messageArea.innerHTML = text;
-            messageArea.className = 'text-xs font-semibold transition-opacity duration-300';
-
-            // スタイルの設定
-            if (type === 'success') {
-                messageArea.classList.add('text-icon-green');
-            } else if (type === 'error') {
-                messageArea.classList.add('text-soft-red');
-            } else {
-                messageArea.classList.add('text-gray-500');
-            }
-
-            // 一定時間後に非表示にする
-            setTimeout(() => {
-                messageArea.classList.remove('text-icon-green', 'text-soft-red', 'text-gray-500');
-                messageArea.innerHTML = '';
-            }, 3000);
+        function formatCurrency(amount) {
+            return `¥${amount.toLocaleString()}`;
         }
 
-        /**
-         * 商品IDから商品オブジェクトを取得
-         */
         function findProductByCode(code) {
             return products.find(p => p.code === code);
         }
-        
-        /**
-         * 指定カテゴリとビーガンフィルターに基づいて商品リストを取得
-         */
-        function getProductsByCategory(category, isVegan) {
-            let filteredProducts = products;
 
-            if (category !== getText('category_all')) {
-                filteredProducts = filteredProducts.filter(p => p[`category_${currentLang}`] === category);
-            }
-
-            if (isVegan) {
-                filteredProducts = filteredProducts.filter(p => p.isVegan);
-            }
-            
-            return filteredProducts;
-        }
-
-        /**
-         * カート内の商品を追加/更新
-         */
-        function updateCart(code, quantity) {
-            if (quantity <= 0) {
-                delete cart[code];
-            } else {
-                const product = findProductByCode(code);
-                if (product) {
-                    cart[code] = { 
-                        product: product, 
-                        quantity: quantity, 
-                        price: product.price 
-                    };
-                }
-            }
-            renderProductList(); 
-            updateTotal();
-        }
-
-        /**
-         * カート内商品の数量を増やす
-         */
-        function increaseQuantity(code) {
-            const currentQty = cart[code] ? cart[code].quantity : 0;
-            updateCart(code, currentQty + 1);
-        }
-
-        /**
-         * カート内商品の数量を減らす
-         */
-        function decreaseQuantity(code) {
-            const currentQty = cart[code] ? cart[code].quantity : 0;
-            updateCart(code, currentQty - 1);
-        }
-        
-        /**
-         * 数値を通貨形式にフォーマット
-         */
-        function formatCurrency(amount) {
-            const formatter = new Intl.NumberFormat(currentLang === 'ja' ? 'ja-JP' : 'en-US', {
-                style: 'currency',
-                currency: currentLang === 'ja' ? 'JPY' : 'USD', 
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-            }).format(amount);
-            
-            return currentLang === 'ja' ? formatter.replace('¥', '') + '円' : formatter;
-        }
-
-        /**
-         * チップ率の表示をフォーマット
-         */
-        function formatTipRate(rate) {
-            return rate === 0 ? getText('tip_none') : `${rate}%`;
-        }
-
-        /**
-         * 変更されない静的なUI要素をレンダリング（主に言語依存のテキスト）
-         */
-        function renderStaticElements() {
-            // ヘッダーの言語切り替えボタン
-            const langToggle = document.getElementById('lang-toggle');
-            if (langToggle) langToggle.innerHTML = getText('lang_button');
-
-            // サブヘッダーのテキストを更新
-            const headerTitleElement = document.getElementById('full-header-title');
-            if (headerTitleElement) {
-                headerTitleElement.innerHTML = 
-                    currentTable ? `${getText('table_display')} ${currentTable} ${getText('header_title')}` : getText('select_table_title');
-            }
-            
-            // ビーガンフィルターのテキスト
-            const filterLabel = document.getElementById('filter-label');
-            if (filterLabel) filterLabel.innerHTML = getText('filter_vegan');
-            const menuTitle = document.getElementById('menu-title');
-            if (menuTitle) menuTitle.innerHTML = getText('menu_title');
-            
-            // フッターのテキスト
-            const subtotalLabel = document.getElementById('subtotal-label');
-            if (subtotalLabel) subtotalLabel.innerHTML = getText('footer_subtotal');
-            const tipLabel = document.getElementById('tip-label');
-            if (tipLabel) tipLabel.innerHTML = getText('footer_tip');
-            const totalLabel = document.getElementById('total-label');
-            if (totalLabel) totalLabel.innerHTML = getText('footer_total');
-            const orderBtn = document.getElementById('order-btn');
-            if (orderBtn) orderBtn.innerHTML = getText('footer_send');
-
-            // チップ詳細のトグルボタンのテキストを現在の状態に応じて更新
-            const detailsBox = document.getElementById('tip-details-box');
-            const toggleButton = document.getElementById('tip-detail-toggle');
-            
-            if (toggleButton && detailsBox) {
-                toggleButton.innerHTML = 
-                    detailsBox.classList.contains('hidden') ? 
-                    getText('detail_open') : getText('detail_close');
-            }
-            
-            // チップ率選択の見出し
-            const tipRateLabel = document.getElementById('tip-rate-label');
-            if (tipRateLabel) tipRateLabel.innerHTML = getText('tip_label');
-        }
-
-        /**
-         * カート内の合計金額を計算
-         */
-        function calculateTotal() {
-            let subtotal = 0;
-            let itemCount = 0;
-            for (const code in cart) {
-                subtotal += cart[code].product.price * cart[code].quantity;
-                itemCount += cart[code].quantity;
-            }
-
-            const tipAmount = Math.round(subtotal * (currentTipRate / 100));
-            const total = subtotal + tipAmount;
-
-            return { subtotal, tipAmount, total, itemCount };
-        }
-
-        /**
-         * 合計金額を更新し、フッターをレンダリング
-         */
-        function updateTotal() {
-            const totals = calculateTotal();
-            const subtotalElement = document.getElementById('subtotal-amount');
-            const tipElement = document.getElementById('tip-amount');
-            const totalElement = document.getElementById('total-amount');
-            const itemCountElement = document.getElementById('item-count');
-            const orderBtn = document.getElementById('order-btn');
-
-            if (!subtotalElement || !tipElement || !totalElement || !itemCountElement || !orderBtn) return;
-
-
-            // 金額表示の更新
-            subtotalElement.innerHTML = formatCurrency(totals.subtotal);
-            tipElement.innerHTML = formatCurrency(totals.tipAmount);
-            totalElement.innerHTML = formatCurrency(totals.total);
-            
-            // アイテム数の更新
-            itemCountElement.innerHTML = `${totals.itemCount}${getText('footer_points_1')}${formatCurrency(totals.subtotal)}${getText('footer_points_2')}`;
-            
-            // 注文ボタンの制御
-            if (totals.itemCount > 0) {
-                orderBtn.disabled = false;
-                orderBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                orderBtn.classList.add('bg-primary-blue', 'hover:bg-primary-hover');
-            } else {
-                orderBtn.disabled = true;
-                orderBtn.classList.remove('bg-primary-blue', 'hover:bg-primary-hover');
-                orderBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
-            }
-        }
-
-        /**
-         * 言語切り替え
-         */
+        // --- 言語切り替え ---
         function toggleLanguage() {
             currentLang = currentLang === 'ja' ? 'en' : 'ja';
             currentCategory = getText('category_all'); 
+            document.getElementById('lang-toggle-btn').textContent = getText('lang_button');
             renderAllUI();
         }
+        
+        function renderStaticElements() {
+            if (currentTable) {
+                document.getElementById('full-header-title').innerHTML = 
+                    `${getText('table_display')} ${currentTable} ${getText('header_title')}`;
+            } else {
+                 document.getElementById('full-header-title').textContent = getText('select_table_title');
+            }
+            document.getElementById('header-subtitle').textContent = getText('header_subtitle');
+            document.getElementById('send-order-btn').textContent = getText('footer_send');
+            
+            document.getElementById('tip-detail-toggle').textContent = isTipDetailsVisible ? getText('detail_close') : getText('detail_open');
+            
+            document.getElementById('subtotal-text').textContent = getText('footer_subtotal');
+            document.getElementById('total-amount-label').textContent = getText('footer_total');
+            document.getElementById('tip-selection-label').textContent = getText('tip_label');
+        }
 
-        /**
-         * カテゴリタブのレンダリング
-         */
-        function renderCategoryTabs() {
-            const tabContainer = document.getElementById('category-tabs');
-            if (!tabContainer) return;
-
-            // カテゴリの一覧を抽出し、重複を削除
-            const categories = [...new Set(products.map(p => p[`category_${currentLang}`]))].filter(c => c); 
-            // 「すべて」を先頭に追加
-            categories.unshift(getText('category_all')); 
-
-            let html = '';
-            categories.forEach(category => {
-                const isActive = category === currentCategory;
-                const buttonClass = isActive
-                    ? 'bg-primary-blue text-white'
-                    : 'text-gray-600 hover:bg-gray-200';
-                
-                // カテゴリ名にシングルクォートが含まれる可能性があるため、エスケープ
-                const escapedCategory = category.replace(/'/g, "\\'");
-
-                html += `
-                    <button class="px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${buttonClass}" 
-                        onclick="selectCategory('${escapedCategory}')">
-                        ${category}
+        // --- テーブル選択処理 ---
+        function renderTableButtons() {
+            const container = document.getElementById('table-selection-grid');
+            container.innerHTML = '';
+            TABLES.forEach(table => {
+                container.innerHTML += `
+                    <button onclick="selectTable('${table}')"
+                            class="bg-primary-blue text-white font-bold py-4 rounded-lg shadow-md hover:bg-primary-hover transition-colors text-xl">
+                        ${table}
                     </button>
                 `;
             });
-            tabContainer.innerHTML = html;
-        }
-
-        /**
-         * カテゴリ選択ハンドラ
-         */
-        function selectCategory(category) {
-            currentCategory = category;
-            renderProductList();
-            renderCategoryTabs(); 
         }
         
-        /**
-         * ビーガンフィルターのレンダリング/制御
-         */
-        function renderFilterControls() {
-            const filterButton = document.getElementById('vegan-filter-button');
-            if (!filterButton) return;
-
-            if (isVeganFilterActive) {
-                filterButton.classList.remove('bg-gray-300', 'hover:bg-gray-400');
-                filterButton.classList.add('bg-icon-green', 'text-white');
-            } else {
-                filterButton.classList.remove('bg-icon-green', 'text-white');
-                filterButton.classList.add('bg-gray-300', 'hover:bg-gray-400');
-            }
-        }
-
-        /**
-         * ビーガンフィルターのトグル
-         */
-        function toggleVeganFilter() {
-            isVeganFilterActive = !isVeganFilterActive;
-            renderProductList();
-            renderFilterControls();
-        }
-
-        /**
-         * 商品リストのレンダリング
-         */
-        function renderProductList() {
-            const listContainer = document.getElementById('product-list');
-            if (!listContainer) return;
-
-            const filteredProducts = getProductsByCategory(currentCategory, isVeganFilterActive);
-
-            if (filteredProducts.length === 0) {
-                listContainer.innerHTML = `
-                    <div class="text-center py-10 text-gray-500">
-                        ${getText('not_found')}
-                    </div>
-                `;
-                return;
-            }
-
-            let html = '';
-            filteredProducts.forEach(product => {
-                const currentQty = cart[product.code] ? cart[product.code].quantity : 0;
-                // 翻訳がない場合は日本語フォールバックを使用 (安全策)
-                const name = product[`name_${currentLang}`] || product.name_ja;
-                const notes = product[`notes_${currentLang}`] || product.notes_ja;
-
-                // アイコンの生成
-                let icons = '';
-                if (product.isVegan) {
-                    icons += `<span title="${getText('icon_vegan')}" class="text-icon-green">🌿</span>`;
-                }
-                if (product.isCooked) {
-                    icons += `<span title="${getText('icon_cooked')}" class="text-icon-yellow">🔥</span>`;
-                }
-                if (product.hasAllergens) {
-                    icons += `<span title="${getText('icon_allergy')}" class="text-soft-red">⚠️</span>`;
-                }
-
-                html += `
-                    <div class="flex items-center bg-white p-3 rounded-xl shadow-sm space-x-3 mb-3" onclick="increaseQuantity('${product.code}')">
-                        
-                        <div class="flex-grow">
-                            <div class="font-bold text-gray-800">${name}</div>
-                            <div class="text-sm text-gray-500">${notes}</div>
-                            <div class="text-lg font-bold text-primary-blue">${formatCurrency(product.price)}</div>
-                        </div>
-
-                        <div class="flex flex-col items-end space-y-2">
-                            <div class="flex space-x-1 text-base">
-                                ${icons}
-                            </div>
-                            
-                            ${currentQty > 0 ? `
-                                <div class="flex items-center space-x-1 bg-primary-blue text-white rounded-full p-1 shadow-md">
-                                    <button class="w-6 h-6 flex items-center justify-center rounded-full bg-white text-primary-blue hover:bg-gray-100" 
-                                            onclick="event.stopPropagation(); decreaseQuantity('${product.code}')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" /></svg>
-                                    </button>
-                                    <span class="font-semibold text-sm w-4 text-center text-white">${currentQty}</span>
-                                    <button class="w-6 h-6 flex items-center justify-center rounded-full bg-white text-primary-blue hover:bg-gray-100" 
-                                            onclick="event.stopPropagation(); increaseQuantity('${product.code}')">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                                    </button>
-                                </div>
-                            ` : `
-                                <button class="w-16 h-8 text-sm font-semibold text-gray-700 rounded-full border-2 border-gray-300 hover:bg-gray-100 transition-colors"
-                                        onclick="event.stopPropagation(); increaseQuantity('${product.code}')">
-                                    追加
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
-            });
-
-            listContainer.innerHTML = html;
-        }
-
-        /**
-         * テーブル選択モーダルの表示
-         */
         function showTableModal() {
             const overlay = document.getElementById('table-modal-overlay');
-            const mainContent = document.getElementById('main-content');
-            const mainFooter = document.getElementById('main-footer');
-            const header = document.getElementById('main-header');
-            const modalContainer = document.getElementById('table-modal-container');
-
-            if (!overlay || !mainContent || !mainFooter || !header || !modalContainer) return;
-            
-            // モーダルのコンテンツをレンダリング
-            let tableButtonsHtml = TABLES.map(table => 
-                `<button class="w-24 h-24 bg-primary-blue text-white text-xl font-bold rounded-xl shadow-lg hover:bg-primary-hover transition-colors" onclick="selectTable('${table}')">${table}</button>`
-            ).join('');
-
-            modalContainer.innerHTML = `
-                <h2 class="text-2xl font-bold mb-6 text-gray-800">${getText('select_table_title')}</h2>
-                <div class="grid grid-cols-3 gap-4">${tableButtonsHtml}</div>
-            `;
-            
-            // UIの表示/非表示制御
             overlay.style.display = 'flex';
-            mainContent.classList.add('hidden');
-            mainFooter.classList.add('hidden');
-            header.classList.add('hidden');
+            renderTableButtons();
         }
 
-        /**
-         * テーブルを選択し、メインメニューを表示する
-         * @param {string} table - 選択されたテーブルID (例: 'T1')
-         */
         function selectTable(table) {
             currentTable = table;
             const overlay = document.getElementById('table-modal-overlay');
             const mainContent = document.getElementById('main-content');
             const mainFooter = document.getElementById('main-footer');
-            const header = document.getElementById('main-header');
 
-            if (!overlay || !mainContent || !mainFooter || !header) return;
-
-            // モーダルを非表示にし、メインコンテンツを表示
             overlay.style.display = 'none';
             mainContent.classList.remove('hidden');
             mainFooter.classList.remove('hidden');
-            header.classList.remove('hidden');
-
-            // UIを完全にレンダリング
+            
             renderAllUI();
         }
-        
-        /**
-         * チップ詳細ボックスのトグル
-         */
-        function toggleTipDetails() {
-            const detailsBox = document.getElementById('tip-details-box');
-            if (!detailsBox) return;
 
-            detailsBox.classList.toggle('hidden');
-            renderStaticElements(); // トグルボタンのテキストを更新
+        // --- カテゴリ/フィルター処理 ---
+
+        /**
+         * カテゴリタブをレンダリングする
+         */
+        function renderCategoryTabs() {
+            const container = document.getElementById('category-tabs');
+            container.innerHTML = '';
+            
+            const categories = CATEGORY_TABS[currentLang];
+            
+            categories.forEach(category => {
+                const isAllTab = category === 'すべて' || category === 'All';
+                const displayText = isAllTab ? getText('category_all') : category;
+                const isVeganTab = category === 'Vegan';
+
+                let isActive = false;
+                let buttonClass = 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100';
+                let onClickAction = `changeCategory('${category}')`;
+
+                if (isVeganTab) {
+                    // Veganタブは、isVeganFilterActiveの状態を直接反映し、専用のトグルアクションを設定
+                    isActive = isVeganFilterActive;
+                    buttonClass = isActive 
+                        ? 'bg-icon-green text-white shadow-md' 
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100';
+                    onClickAction = `toggleVeganCategoryFilter()`;
+                } else {
+                    // 通常のカテゴリタブ
+                    isActive = (currentCategory === category) || 
+                               (isAllTab && currentCategory === getText('category_all'));
+                    
+                    buttonClass = isActive 
+                        ? 'bg-primary-blue text-white shadow-md' 
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100';
+                }
+                
+                container.innerHTML += `
+                    <button onclick="${onClickAction}" 
+                            class="flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-150 ${buttonClass}">
+                        ${displayText}
+                    </button>
+                `;
+            });
         }
 
         /**
-         * チップ選択ボタンのレンダリング
+         * カテゴリを変更する
          */
+        function changeCategory(category) {
+            if (category === 'Vegan') {
+                toggleVeganCategoryFilter();
+                return;
+            }
+
+            // 他のカテゴリを選択した場合、Veganフィルターをオフにし、カテゴリを切り替える
+            isVeganFilterActive = false;
+            currentCategory = category;
+            renderAllUI();
+        }
+
+        /**
+         * Veganフィルターをトグルする (Veganカテゴリタブ用)
+         */
+        function toggleVeganCategoryFilter() {
+            isVeganFilterActive = !isVeganFilterActive;
+            
+            // Veganフィルターがオンの場合、通常のカテゴリを「すべて」にリセット
+            if (isVeganFilterActive) {
+                currentCategory = getText('category_all'); 
+            }
+            
+            renderAllUI();
+        }
+
+        /**
+         * 商品リストをレンダリングする (サムネイル表示に対応)
+         */
+        function renderProductList() {
+            const list = document.getElementById('product-list');
+            list.innerHTML = '';
+            
+            const categoryKey = currentLang === 'ja' ? 'category_ja' : 'category_en';
+            
+            const filteredProducts = products.filter(product => {
+                let categoryMatch = currentCategory === getText('category_all') || 
+                                    product[categoryKey] === currentCategory;
+                
+                // Veganフィルターがオンの場合、isVegan: true の商品のみを表示
+                if (isVeganFilterActive) {
+                    categoryMatch = product.isVegan === true;
+                }
+
+                return categoryMatch;
+            });
+
+            if (filteredProducts.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-500 mt-10">${getText('not_found')}</p>`;
+                return;
+            }
+
+            list.className = "grid grid-cols-1 md:grid-cols-2 gap-6";
+            
+            filteredProducts.forEach(product => {
+                const currentQty = cart[product.code] ? cart[product.code].quantity : 0;
+                const nameKey = currentLang === 'ja' ? 'name_ja' : 'name_en';
+                const notesKey = currentLang === 'ja' ? 'notes_ja' : 'notes_en';
+
+                // サムネイル表示のためのHTML構造
+                // 🚨 画像は /img/product_[商品コード].jpg というパスを想定しています。
+                const imagePath = `img/product_${product.code}.jpg`; 
+                const imageHTML = `
+                    <div class="w-20 h-20 bg-gray-200 flex-shrink-0 overflow-hidden rounded-lg">
+                        <img src="${imagePath}" 
+                            alt="${product[nameKey]} ${getText('image_text')}" 
+                            class="w-full h-full object-cover"
+                            onerror="this.parentElement.style.display='none'; this.closest('.flex').classList.add('space-x-0', 'pl-0');">
+                    </div>
+                `;
+
+                const productHTML = `
+                    <div class="bg-white p-4 rounded-xl shadow-lg flex space-x-4 cursor-pointer hover:shadow-xl transition" onclick="showDetailModal('${product.code}')">
+                        
+                        ${imageHTML}
+
+                        <div class="flex-grow">
+                            <h3 class="text-base font-bold text-gray-800">${product[nameKey]}</h3>
+                            <p class="text-xs text-gray-500 mt-1">${product[notesKey]}</p>
+                            <p class="text-lg font-extrabold text-primary-blue mt-2">${formatCurrency(product.price)}</p>
+                        </div>
+                        
+                        <div class="flex flex-col items-end justify-center">
+                            <div class="flex items-center space-x-2">
+                                <button onclick="event.stopPropagation(); updateCart('${product.code}', -1);" 
+                                        class="qty-btn bg-soft-red text-white">
+                                    -
+                                </button>
+                                <span id="qty-${product.code}" class="text-xl font-bold w-6 text-center">
+                                    ${currentQty}
+                                </span>
+                                <button onclick="event.stopPropagation(); updateCart('${product.code}', 1);" 
+                                        class="qty-btn bg-icon-green text-white">
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                list.innerHTML += productHTML;
+            });
+        }
+        
+        // --- カートと合計の計算 ---
+        
+        function updateCart(productCode, change) {
+            const product = findProductByCode(productCode);
+            if (!product) return;
+
+            if (!cart[productCode]) {
+                cart[productCode] = { quantity: 0, price: product.price };
+            }
+
+            let newQty = cart[productCode].quantity + change;
+            
+            if (newQty < 0) newQty = 0;
+            
+            if (newQty === 0) {
+                delete cart[productCode];
+            } else {
+                cart[productCode].quantity = newQty;
+            }
+
+            const qtyDisplay = document.getElementById(`qty-${productCode}`);
+            if (qtyDisplay) qtyDisplay.textContent = newQty;
+            
+            updateTotal();
+        }
+
+        /**
+         * カートの合計金額を更新する (夜間料金に対応)
+         */
+        function updateTotal() {
+            let subtotal = 0;
+            let totalItems = 0;
+
+            for (const code in cart) {
+                const item = cart[code];
+                subtotal += item.quantity * item.price;
+                totalItems += item.quantity;
+            }
+
+            // --- 夜間料金の計算ロジック (22時以降 10%) ---
+            const now = new Date();
+            const currentHour = now.getHours(); 
+            let nightSurchargeAmount = 0;
+
+            if (currentHour >= NIGHT_SURCHARGE_THRESHOLD) { // 22時 (22:00) 以降
+                // 小計に対する10%を計算し、四捨五入して円単位にする
+                nightSurchargeAmount = Math.round(subtotal * NIGHT_SURCHARGE_RATE);
+            }
+            // ------------------------------------
+
+            // チップの計算
+            const tipAmount = Math.round(subtotal * (currentTipRate / 100));
+
+            // 合計金額 = 小計 + 夜間料金 + チップ
+            const totalAmount = subtotal + nightSurchargeAmount + tipAmount;
+
+            // --- Footer UIの更新 ---
+            document.getElementById('subtotal-display').textContent = formatCurrency(subtotal);
+            
+            // 夜間料金の表示更新
+            const nightSurchargeRow = document.getElementById('night-surcharge-row');
+            const nightSurchargeDisplay = document.getElementById('night-surcharge-display');
+            const nightSurchargeText = document.getElementById('night-surcharge-text');
+            
+            if (nightSurchargeAmount > 0) {
+                nightSurchargeRow.classList.remove('hidden'); // 行を表示
+                nightSurchargeText.textContent = getText('night_surcharge_text');
+                nightSurchargeDisplay.textContent = formatCurrency(nightSurchargeAmount);
+            } else {
+                nightSurchargeRow.classList.add('hidden'); // 行を非表示
+            }
+
+            // チップの表示更新
+            document.getElementById('tip-amount-display').textContent = formatCurrency(tipAmount);
+            document.getElementById('tip-text').textContent = `${getText('footer_tip')} (${currentTipRate}%)`;
+            
+            // 最終合計金額の表示
+            document.getElementById('total-amount-display').textContent = formatCurrency(totalAmount);
+            
+            // サマリーポイントの更新
+            document.getElementById('summary-points').textContent = 
+                `${totalItems}${getText('footer_points_1')}${formatCurrency(subtotal)}${getText('footer_points_2')}`;
+            
+            // 注文ボタンの有効化/無効化ロジック
+            const sendBtn = document.getElementById('send-order-btn');
+            if (totalItems > 0) {
+                sendBtn.disabled = false;
+                sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                sendBtn.disabled = true;
+                sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+        
+        // --- チップの表示/選択 ---
+
         function renderTipButtons() {
-            const buttonContainer = document.getElementById('tip-buttons');
-            if (!buttonContainer) return;
+            const container = document.getElementById('tip-buttons-container');
+            container.innerHTML = '';
 
-            let html = TIP_RATES.map(rate => {
+            TIP_RATES.forEach(rate => {
+                const display = rate === 0 ? getText('tip_none') : `${rate}%`;
                 const isSelected = rate === currentTipRate;
-                const buttonClass = isSelected ? 'tip-selected bg-primary-blue text-white' : 'tip-unselected';
-                const rateText = formatTipRate(rate);
-
-                return `
+                
+                container.innerHTML += `
                     <div class="tip-label">
-                        <button class="tip-button ${buttonClass}" 
-                            onclick="selectTip(${rate})">
-                            ${rateText}
+                        <button onclick="selectTipRate(${rate})"
+                                class="tip-button ${isSelected ? 'tip-selected' : ''}">
+                            ${display}
                         </button>
                     </div>
                 `;
-            }).join('');
-            
-            buttonContainer.innerHTML = html;
-        }
-
-        /**
-         * チップ率の選択
-         */
-        function selectTip(rate) {
-            currentTipRate = rate;
-            renderTipButtons(); 
-            updateTotal(); 
+            });
         }
         
-        /**
-         * 注文をFirebaseに送信
-         */
+        function selectTipRate(rate) {
+            currentTipRate = rate;
+            renderTipButtons(); // ボタンの選択状態を更新
+            updateTotal();      // 合計金額を再計算
+        }
+        
+        function toggleTipDetails() {
+            isTipDetailsVisible = !isTipDetailsVisible;
+            const detailBox = document.getElementById('tip-detail-box');
+            const toggleBtn = document.getElementById('tip-detail-toggle');
+
+            if (isTipDetailsVisible) {
+                detailBox.style.maxHeight = detailBox.scrollHeight + "px";
+                detailBox.classList.remove('opacity-0');
+                detailBox.classList.remove('hidden');
+                toggleBtn.textContent = getText('detail_close');
+            } else {
+                detailBox.style.maxHeight = "0";
+                detailBox.classList.add('opacity-0');
+                // アニメーション完了後にhiddenを追加したいが、ここでは即時追加
+                detailBox.classList.add('hidden'); 
+                toggleBtn.textContent = getText('detail_open');
+            }
+        }
+
+        // --- 注文送信 (Firebase) ---
+
         function sendOrder() {
-            const totals = calculateTotal();
-            
-            if (totals.itemCount === 0) {
+            if (Object.keys(cart).length === 0) {
                 showMessage(getText('message_error'), 'error');
                 return;
             }
 
-            const orderDetails = {
+            const now = new Date();
+            const timestamp = now.toISOString();
+
+            // 小計、夜間料金、チップを再計算して注文データに含める
+            let subtotal = 0;
+            for (const code in cart) {
+                subtotal += cart[code].quantity * cart[code].price;
+            }
+
+            const currentHour = now.getHours(); 
+            let nightSurchargeAmount = 0;
+            if (currentHour >= NIGHT_SURCHARGE_THRESHOLD) {
+                nightSurchargeAmount = Math.round(subtotal * NIGHT_SURCHARGE_RATE);
+            }
+            const tipAmount = Math.round(subtotal * (currentTipRate / 100));
+            const totalAmount = subtotal + nightSurchargeAmount + tipAmount;
+
+
+            const orderData = {
                 table: currentTable,
-                subtotal: totals.subtotal,
-                tip_rate: currentTipRate,
-                tip_amount: totals.tipAmount,
-                total: totals.total,
-                items: Object.values(cart).map(item => ({
-                    code: item.product.code,
-                    name: item.product[`name_${currentLang}`] || item.product.name_ja,
-                    quantity: item.quantity,
-                    price: item.price,
-                    line_total: item.price * item.quantity
-                })),
-                timestamp: new Date().toISOString()
+                timestamp: timestamp,
+                app_id: APP_ID,
+                status: 'pending',
+                items: cart,
+                // 料金詳細を注文データに含める
+                summary: {
+                    subtotal: subtotal,
+                    tip_rate: currentTipRate,
+                    tip_amount: tipAmount,
+                    night_surcharge_rate: nightSurchargeAmount > 0 ? NIGHT_SURCHARGE_RATE : 0,
+                    night_surcharge_amount: nightSurchargeAmount,
+                    total_amount: totalAmount
+                }
             };
 
-            // Firebaseの初期化チェック
-            if (typeof firebase === 'undefined' || firebase.apps.length === 0) {
-                console.error("Firebase is not initialized.");
-                showMessage(getText('message_sent_failure') + '\nFirebaseが初期化されていません。', 'error');
-                return;
-            }
-            
-            const db = firebase.database();
-            db.ref(`orders/${currentTable}/${Date.now()}`).set(orderDetails)
+            const dbRef = firebase.database().ref('orders/' + currentTable).push();
+            dbRef.set(orderData)
                 .then(() => {
                     // 成功時の処理
-                    cart = {}; // カートをクリア
+                    cart = {}; // カートをリセット
+                    currentTipRate = TIP_RATES[0]; // チップもリセット
                     renderAllUI();
                     showMessage(getText('message_sent_success'), 'success');
                 })
@@ -844,38 +824,42 @@ const products = [
                     showMessage(getText('message_sent_failure') + '\n' + error.message, 'error');
                 });
         }
+        
+        // --- 初期化/全体レンダリング ---
+
+        function renderFilterControls() {
+            // 現在の要件ではフィルターコントロール（isCooked, hasAllergensなど）は非表示
+            document.getElementById('filter-controls').style.display = 'none';
+        }
+
+        function showDetailModal(code) {
+             // この関数は、商品リストのクリックイベントで呼び出されます
+             console.log('Show detail modal for:', code);
+             // ここに商品詳細モーダル表示の実際のロジックを実装してください
+        }
 
         /**
          * 全てのUIコンポーネントをレンダリング/更新
          */
         function renderAllUI() {
-            renderStaticElements(); 
+            renderStaticElements();
             renderFilterControls();
             renderCategoryTabs();
             renderProductList();
-            renderTipButtons();
+            renderTipButtons(); 
             updateTotal(); 
         }
 
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Firebaseの初期化
-            if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
-                try {
-                    firebase.initializeApp(firebaseConfig);
-                    console.log("Firebase initialized successfully.");
-                } catch (e) {
-                    console.error("Firebase initialization failed:", e);
-                }
-            } else if (typeof firebase === 'undefined') {
-                console.error("Firebase SDK is not loaded. Check the <script> tags.");
-            }
-            
             currentCategory = getText('category_all');
             
             // 初回ロード時にテーブル選択モーダルを表示
             showTableModal(); 
         });
+
     </script>
+
 </body>
 </html>
+
