@@ -506,18 +506,6 @@
         
         renderAllUI();
     }
-    
-    /**
-     * 全てのUIコンポーネントをレンダリング/更新
-     */
-    function renderAllUI() {
-        renderStaticElements();
-        renderFilterControls();
-        renderCategoryTabs();
-        renderProductList();
-        renderTipButtons(); 
-        updateTotal(); 
-    }
 
     /**
      * 画面上部の静的要素（ヘッダー、カートボタンのテキストなど）を更新
@@ -731,7 +719,19 @@
             sendButton.classList.add('opacity-50', 'cursor-not-allowed');
         }
     }
-
+    
+    /**
+     * 全てのUIコンポーネントをレンダリング/更新
+     */
+    function renderAllUI() {
+        renderStaticElements();
+        renderFilterControls();
+        renderCategoryTabs();
+        renderProductList();
+        renderTipButtons(); 
+        updateTotal(); 
+    }
+    
     /**
      * 注文データをFirebase Realtime Databaseに送信する
      */
@@ -801,3 +801,4 @@
 
 </body>
 </html>
+
