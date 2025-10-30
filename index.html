@@ -129,6 +129,120 @@
     measurementId: "G-HN9B1GTJQP"
   };
         firebase.initializeApp(firebaseConfig);
+
+// --- Firebase初期化後に実行してください ---
+
+// 商品リストのコンテナ要素をIDで取得。もし存在しなければ、安全のため警告を出しbodyをフォールバックとして使用。
+// **注意**: 適切なIDがHTMLにあるか確認してください。
+const menuListElement = document.getElementById('menu-items-container') || document.body;
+
+/**
+ * 取得した商品データを画面にレンダリングします。
+ * @param {object | null} menuItems - Firebaseから取得した商品データオブジェクト
+ */
+function renderMenuItems(menuItems) {
+    // 既存のリスト内容をクリア
+    menuListElement.innerHTML = ''; 
+
+    if (!menuItems || Object.keys(menuItems).length === 0) {
+        // 商品が見つからなかった場合の処理
+        menuListElement.innerHTML = `<p class="text-center text-gray-500 p-8">該当する商品が見つかりませんでした。</p>`;
+        return;
+    }
+    
+    // データをリストとしてレンダリングする
+    const ul = document.createElement('ul');
+    // Tailwind CSSを使用して、レスポンシブなグリッドレイアウトを設定
+    ul.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-4 max-w-7xl mx-auto';
+    
+    Object.keys(menuItems).forEach(code => {
+        const item = menuItems[code];
+        const li = document.createElement('li');
+        // 商品カードのデザイン
+        li.className = 'bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden cursor-pointer';
+        
+        // ★★★ 修正箇所: img/ を追加して、画像を public/img から参照するようにする ★★★
+        // 例: img/product_1101.jpg
+        const imageUrl = `img/product_${code}.jpg`;
+
+        // データのキーを修正: category_jaとname_jaを使用
+        const name = item.name_ja || item.name || '商品名不明';
+        const category = item.category_ja || item.category || 'カテゴリー不明';
+        const price = item.price ? item.price.toLocaleString() : '???';
+
+        // <li>要素のHTML構造
+        // onerrorは削除済み (プレースホルダーをアップロードしたため)
+        li.innerHTML = `
+            <div class="h-40 bg-gray-200 flex items-center justify-center relative">
+                <img id="img-${code}" src="${imageUrl}" alt="${name}" 
+                     class="w-full h-full object-cover" 
+                     style="object-fit: contain;"
+                >
+            </div>
+            
+            <div class="p-4">
+                <p class="text-xs font-medium text-blue-600 uppercase">${category}</p>
+                <h3 class="text-lg font-bold text-gray-900 mt-1">${name}</h3>
+                <p class="text-2xl font-extrabold text-red-600 mt-2">¥${price}</p>
+                <button data-code="${code}" class="mt-4 w-full bg-green-500 text-white font-bold py-2 rounded-lg hover:bg-green-600 transition duration-150">
+                    追加
+                </button>
+            </div>
+        `;
+        
+        ul.appendChild(li);
+    });
+    
+    menuListElement.appendChild(ul);
+    console.log(`✅ 商品データ ${Object.keys(menuItems).length} 件のレンダリングを試行しました。`);
+}
+
+/**
+ * Firebase Realtime Databaseからデータを取得し、レンダリングを開始します。
+ */
+function fetchAndRenderData() {
+    // データベースのノード名を設定
+    const dbRef = firebase.database().ref('menuItems'); 
+    
+    console.log("Firebase 'menuItems'ノードからデータを読み込み中...");
+    
+    // データを一度だけ取得
+    dbRef.once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const menuItems = snapshot.val();
+            
+            // データ形式のチェックを強化
+            if (menuItems && typeof menuItems === 'object' && !Array.isArray(menuItems)) {
+                console.log("✅ データ取得に成功しました。オブジェクト形式の商品データ:", menuItems);
+                renderMenuItems(menuItems);
+            } else {
+                console.error("❌ データ形式が不正です。オブジェクト形式の商品データが期待されます。", menuItems);
+                renderMenuItems(null);
+            }
+            
+        } else {
+            console.log("❌ データ取得に失敗しました。'menuItems'ノードにデータが見つかりません。");
+            renderMenuItems(null); // 「見つかりませんでした」を表示
+        }
+    }, (error) => {
+        // 通信エラーやパーミッションエラー
+        console.error("致命的なデータ取得エラー:", error.code, error.message);
+        renderMenuItems(null);
+    });
+}
+
+// ページロード時にデータ取得を開始
+window.onload = function() {
+    // Firebaseが初期化されていることを確認
+    if (typeof firebase !== 'undefined') {
+        fetchAndRenderData();
+    } else {
+        console.error("Firebaseが初期化されていません。");
+    }
+};
+
+
+
     </script>
     
     <div id="table-modal-overlay" class="modal-overlay">
