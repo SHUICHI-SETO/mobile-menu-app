@@ -161,9 +161,10 @@ function renderMenuItems(menuItems) {
         // 商品カードのデザイン
         li.className = 'bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden cursor-pointer';
         
-        // ★★★ 修正箇所: img/ を追加して、画像を public/img から参照するようにする ★★★
-        // 例: img/product_1101.jpg
-        const imageUrl = `img/product_${code}.jpg`;
+        // ★★★ 修正箇所: 絶対パス /mobile-menu-app/img/ を使用する ★★★
+        // GitHub Pagesのサブディレクトリ構成に対応するための絶対パス
+        // パス: /mobile-menu-app/img/product_1101.jpg
+        const imageUrl = `/mobile-menu-app/img/product_${code}.jpg`;
 
         // データのキーを修正: category_jaとname_jaを使用
         const name = item.name_ja || item.name || '商品名不明';
